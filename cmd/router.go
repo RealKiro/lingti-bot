@@ -9,17 +9,20 @@ import (
 	"syscall"
 
 	"github.com/pltanton/lingti-bot/internal/agent"
+	"github.com/pltanton/lingti-bot/internal/platforms/feishu"
 	"github.com/pltanton/lingti-bot/internal/platforms/slack"
 	"github.com/pltanton/lingti-bot/internal/router"
 	"github.com/spf13/cobra"
 )
 
 var (
-	slackBotToken string
-	slackAppToken string
-	claudeAPIKey  string
-	claudeBaseURL string
-	claudeModel   string
+	slackBotToken  string
+	slackAppToken  string
+	feishuAppID    string
+	feishuAppSecret string
+	claudeAPIKey   string
+	claudeBaseURL  string
+	claudeModel    string
 )
 
 var routerCmd = &cobra.Command{
@@ -31,6 +34,8 @@ var routerCmd = &cobra.Command{
 Required environment variables or flags:
   - SLACK_BOT_TOKEN: Slack Bot Token (xoxb-...)
   - SLACK_APP_TOKEN: Slack App Token (xapp-...)
+  - FEISHU_APP_ID: Feishu App ID
+  - FEISHU_APP_SECRET: Feishu App Secret
   - ANTHROPIC_API_KEY: Claude API Key
   - ANTHROPIC_BASE_URL: Custom API base URL (optional)`,
 	Run: runRouter,
@@ -41,6 +46,8 @@ func init() {
 
 	routerCmd.Flags().StringVar(&slackBotToken, "slack-bot-token", "", "Slack Bot Token (or SLACK_BOT_TOKEN env)")
 	routerCmd.Flags().StringVar(&slackAppToken, "slack-app-token", "", "Slack App Token (or SLACK_APP_TOKEN env)")
+	routerCmd.Flags().StringVar(&feishuAppID, "feishu-app-id", "", "Feishu App ID (or FEISHU_APP_ID env)")
+	routerCmd.Flags().StringVar(&feishuAppSecret, "feishu-app-secret", "", "Feishu App Secret (or FEISHU_APP_SECRET env)")
 	routerCmd.Flags().StringVar(&claudeAPIKey, "api-key", "", "Claude API Key (or ANTHROPIC_API_KEY env)")
 	routerCmd.Flags().StringVar(&claudeBaseURL, "base-url", "", "Custom API base URL (or ANTHROPIC_BASE_URL env)")
 	routerCmd.Flags().StringVar(&claudeModel, "model", "", "Claude model to use (or ANTHROPIC_MODEL env)")
@@ -53,6 +60,12 @@ func runRouter(cmd *cobra.Command, args []string) {
 	}
 	if slackAppToken == "" {
 		slackAppToken = os.Getenv("SLACK_APP_TOKEN")
+	}
+	if feishuAppID == "" {
+		feishuAppID = os.Getenv("FEISHU_APP_ID")
+	}
+	if feishuAppSecret == "" {
+		feishuAppSecret = os.Getenv("FEISHU_APP_SECRET")
 	}
 	if claudeAPIKey == "" {
 		claudeAPIKey = os.Getenv("ANTHROPIC_API_KEY")
@@ -97,6 +110,21 @@ func runRouter(cmd *cobra.Command, args []string) {
 		r.Register(slackPlatform)
 	} else {
 		log.Println("Slack tokens not provided, skipping Slack integration")
+	}
+
+	// Register Feishu if tokens are provided
+	if feishuAppID != "" && feishuAppSecret != "" {
+		feishuPlatform, err := feishu.New(feishu.Config{
+			AppID:     feishuAppID,
+			AppSecret: feishuAppSecret,
+		})
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error creating Feishu platform: %v\n", err)
+			os.Exit(1)
+		}
+		r.Register(feishuPlatform)
+	} else {
+		log.Println("Feishu tokens not provided, skipping Feishu integration")
 	}
 
 	// Start the router

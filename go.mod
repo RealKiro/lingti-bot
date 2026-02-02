@@ -3,6 +3,7 @@ module github.com/pltanton/lingti-bot
 go 1.23
 
 require (
+	github.com/larksuite/oapi-sdk-go/v3 v3.5.3
 	github.com/liushuangls/go-anthropic/v2 v2.14.1
 	github.com/mark3labs/mcp-go v0.27.0
 	github.com/shirou/gopsutil/v4 v4.24.11
@@ -14,8 +15,9 @@ require (
 require (
 	github.com/ebitengine/purego v0.8.1 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
+	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/google/uuid v1.6.0 // indirect
-	github.com/gorilla/websocket v1.4.2 // indirect
+	github.com/gorilla/websocket v1.5.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
 	github.com/power-devops/perfstat v0.0.0-20210106213030-5aafc221ea8c // indirect
