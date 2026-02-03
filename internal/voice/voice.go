@@ -317,7 +317,7 @@ func (p *SystemProvider) linuxTTS(ctx context.Context, text string, opts TTSOpti
 	return os.ReadFile(tmpFile.Name())
 }
 
-// macSTT uses macOS Dictation (requires accessibility permissions)
+// macSTT uses whisper.cpp for speech-to-text
 func (p *SystemProvider) macSTT(ctx context.Context, audio []byte, opts STTOptions) (string, error) {
 	// Save audio to temp file
 	tmpFile, err := os.CreateTemp("", "stt-*.wav")
@@ -331,24 +331,74 @@ func (p *SystemProvider) macSTT(ctx context.Context, audio []byte, opts STTOptio
 	}
 	tmpFile.Close()
 
-	// Use whisper.cpp if available, otherwise return error
-	whisperPath, err := exec.LookPath("whisper")
-	if err != nil {
-		// Try whisper.cpp
-		whisperPath, err = exec.LookPath("whisper-cpp")
+	// Find whisper binary - try multiple names
+	var whisperPath string
+	for _, name := range []string{"whisper-cli", "whisper", "whisper-cpp"} {
+		if path, err := exec.LookPath(name); err == nil {
+			whisperPath = path
+			break
+		}
 	}
 
-	if err != nil {
-		return "", fmt.Errorf("no STT engine available (install whisper or whisper.cpp)")
+	if whisperPath == "" {
+		return "", fmt.Errorf("no STT engine available (install whisper-cpp: brew install whisper-cpp)")
 	}
 
-	cmd := exec.CommandContext(ctx, whisperPath, "-f", tmpFile.Name(), "-otxt")
-	output, err := cmd.Output()
+	// Find model file
+	modelPath := findWhisperModel()
+	if modelPath == "" {
+		return "", fmt.Errorf("whisper model not found (download from https://huggingface.co/ggerganov/whisper.cpp)")
+	}
+
+	// Run whisper-cli
+	cmd := exec.CommandContext(ctx, whisperPath, "-m", modelPath, "-f", tmpFile.Name(), "--no-prints", "-nt")
+	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return "", fmt.Errorf("whisper failed: %w", err)
+		return "", fmt.Errorf("whisper failed: %w\n%s", err, output)
 	}
 
 	return strings.TrimSpace(string(output)), nil
+}
+
+// findWhisperModel searches for a whisper model file
+func findWhisperModel() string {
+	homeDir, _ := os.UserHomeDir()
+
+	// Common model locations
+	searchPaths := []string{
+		// User-specific locations
+		filepath.Join(homeDir, ".local", "share", "whisper", "ggml-base.bin"),
+		filepath.Join(homeDir, ".local", "share", "whisper", "ggml-small.bin"),
+		filepath.Join(homeDir, ".local", "share", "whisper", "ggml-tiny.bin"),
+		filepath.Join(homeDir, ".cache", "whisper", "ggml-base.bin"),
+		filepath.Join(homeDir, ".cache", "whisper", "ggml-small.bin"),
+		filepath.Join(homeDir, ".cache", "whisper", "ggml-tiny.bin"),
+		// Homebrew locations
+		"/opt/homebrew/share/whisper-cpp/ggml-base.bin",
+		"/opt/homebrew/share/whisper-cpp/ggml-small.bin",
+		"/opt/homebrew/share/whisper-cpp/ggml-tiny.bin",
+		"/opt/homebrew/Cellar/whisper-cpp/1.8.3/share/whisper-cpp/for-tests-ggml-tiny.bin",
+		"/usr/local/share/whisper-cpp/ggml-base.bin",
+		// Linux locations
+		"/usr/share/whisper-cpp/ggml-base.bin",
+		"/usr/local/share/whisper/ggml-base.bin",
+	}
+
+	// Check WHISPER_MODEL env var first
+	if modelPath := os.Getenv("WHISPER_MODEL"); modelPath != "" {
+		if _, err := os.Stat(modelPath); err == nil {
+			return modelPath
+		}
+	}
+
+	// Search common paths
+	for _, path := range searchPaths {
+		if _, err := os.Stat(path); err == nil {
+			return path
+		}
+	}
+
+	return ""
 }
 
 // OpenAIProvider uses OpenAI's TTS/STT APIs
