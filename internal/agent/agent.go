@@ -8,6 +8,7 @@ import (
 	"os"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/pltanton/lingti-bot/internal/router"
 )
@@ -15,6 +16,7 @@ import (
 // Agent processes messages using AI providers and tools
 type Agent struct {
 	provider Provider
+	memory   *ConversationMemory
 }
 
 // Config holds agent configuration
@@ -38,6 +40,7 @@ func New(cfg Config) (*Agent, error) {
 
 	return &Agent{
 		provider: provider,
+		memory:   NewMemory(50, 60*time.Minute), // Keep 50 messages, 60 min TTL
 	}, nil
 }
 
@@ -79,7 +82,13 @@ func (a *Agent) handleBuiltinCommand(msg router.Message) (router.Response, bool)
 		}, true
 	case "/help", "help", "帮助":
 		return router.Response{
-			Text: "可用命令:\n- /whoami - 查看你的用户信息\n- /help - 显示帮助\n\n你也可以直接用自然语言和我对话！",
+			Text: "可用命令:\n- /whoami - 查看你的用户信息\n- /new - 开始新对话（清除历史）\n- /help - 显示帮助\n\n你也可以直接用自然语言和我对话！",
+		}, true
+	case "/new", "/reset", "/clear", "新对话", "清除历史":
+		convKey := ConversationKey(msg.Platform, msg.ChannelID, msg.UserID)
+		a.memory.Clear(convKey)
+		return router.Response{
+			Text: "已开始新对话，之前的对话历史已清除。",
 		}, true
 	}
 
@@ -95,16 +104,23 @@ func (a *Agent) HandleMessage(ctx context.Context, msg router.Message) (router.R
 		return resp, nil
 	}
 
+	// Generate conversation key
+	convKey := ConversationKey(msg.Platform, msg.ChannelID, msg.UserID)
+
 	// Build the tools list
 	tools := a.buildToolsList()
 
-	// Create initial messages
-	messages := []Message{
-		{
-			Role:    "user",
-			Content: msg.Text,
-		},
-	}
+	// Get conversation history
+	history := a.memory.GetHistory(convKey)
+	log.Printf("[Agent] Conversation key: %s, history messages: %d", convKey, len(history))
+
+	// Create messages with history
+	messages := make([]Message, 0, len(history)+1)
+	messages = append(messages, history...)
+	messages = append(messages, Message{
+		Role:    "user",
+		Content: msg.Text,
+	})
 
 	// Get system info for context
 	homeDir, _ := os.UserHomeDir()
@@ -189,6 +205,12 @@ func (a *Agent) HandleMessage(ctx context.Context, msg router.Message) (router.R
 			return router.Response{}, fmt.Errorf("AI error: %w", err)
 		}
 	}
+
+	// Save conversation to memory
+	a.memory.AddExchange(convKey,
+		Message{Role: "user", Content: msg.Text},
+		Message{Role: "assistant", Content: resp.Content},
+	)
 
 	return router.Response{Text: resp.Content}, nil
 }
