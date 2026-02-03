@@ -162,3 +162,281 @@ func extractText(result *mcp.CallToolResult) string {
 
 	return ""
 }
+
+// === CALENDAR ===
+
+func executeCalendarCreate(ctx context.Context, args map[string]any) string {
+	req := mcp.CallToolRequest{}
+	req.Params.Arguments = args
+	result, err := tools.CalendarCreateEvent(ctx, req)
+	if err != nil {
+		return "Error: " + err.Error()
+	}
+	return extractText(result)
+}
+
+func executeCalendarSearch(ctx context.Context, args map[string]any) string {
+	req := mcp.CallToolRequest{}
+	req.Params.Arguments = args
+	result, err := tools.CalendarSearchEvents(ctx, req)
+	if err != nil {
+		return "Error: " + err.Error()
+	}
+	return extractText(result)
+}
+
+func executeCalendarDelete(ctx context.Context, args map[string]any) string {
+	req := mcp.CallToolRequest{}
+	req.Params.Arguments = args
+	result, err := tools.CalendarDeleteEvent(ctx, req)
+	if err != nil {
+		return "Error: " + err.Error()
+	}
+	return extractText(result)
+}
+
+// === REMINDERS ===
+
+func executeRemindersToday(ctx context.Context) string {
+	req := mcp.CallToolRequest{}
+	req.Params.Arguments = map[string]interface{}{}
+	result, err := tools.RemindersToday(ctx, req)
+	if err != nil {
+		return "Error: " + err.Error()
+	}
+	return extractText(result)
+}
+
+func executeRemindersAdd(ctx context.Context, args map[string]any) string {
+	req := mcp.CallToolRequest{}
+	req.Params.Arguments = args
+	result, err := tools.RemindersAdd(ctx, req)
+	if err != nil {
+		return "Error: " + err.Error()
+	}
+	return extractText(result)
+}
+
+func executeRemindersComplete(ctx context.Context, title string) string {
+	req := mcp.CallToolRequest{}
+	req.Params.Arguments = map[string]interface{}{"title": title}
+	result, err := tools.RemindersComplete(ctx, req)
+	if err != nil {
+		return "Error: " + err.Error()
+	}
+	return extractText(result)
+}
+
+func executeRemindersDelete(ctx context.Context, title string) string {
+	req := mcp.CallToolRequest{}
+	req.Params.Arguments = map[string]interface{}{"title": title}
+	result, err := tools.RemindersDelete(ctx, req)
+	if err != nil {
+		return "Error: " + err.Error()
+	}
+	return extractText(result)
+}
+
+// === NOTES ===
+
+func executeNotesList(ctx context.Context, args map[string]any) string {
+	req := mcp.CallToolRequest{}
+	req.Params.Arguments = args
+	result, err := tools.NotesListNotes(ctx, req)
+	if err != nil {
+		return "Error: " + err.Error()
+	}
+	return extractText(result)
+}
+
+func executeNotesRead(ctx context.Context, title string) string {
+	req := mcp.CallToolRequest{}
+	req.Params.Arguments = map[string]interface{}{"title": title}
+	result, err := tools.NotesRead(ctx, req)
+	if err != nil {
+		return "Error: " + err.Error()
+	}
+	return extractText(result)
+}
+
+func executeNotesCreate(ctx context.Context, args map[string]any) string {
+	req := mcp.CallToolRequest{}
+	req.Params.Arguments = args
+	result, err := tools.NotesCreate(ctx, req)
+	if err != nil {
+		return "Error: " + err.Error()
+	}
+	return extractText(result)
+}
+
+func executeNotesSearch(ctx context.Context, keyword string) string {
+	req := mcp.CallToolRequest{}
+	req.Params.Arguments = map[string]interface{}{"keyword": keyword}
+	result, err := tools.NotesSearch(ctx, req)
+	if err != nil {
+		return "Error: " + err.Error()
+	}
+	return extractText(result)
+}
+
+// === WEATHER ===
+
+func executeWeatherCurrent(ctx context.Context, location string) string {
+	req := mcp.CallToolRequest{}
+	req.Params.Arguments = map[string]interface{}{"location": location}
+	result, err := tools.WeatherCurrent(ctx, req)
+	if err != nil {
+		return "Error: " + err.Error()
+	}
+	return extractText(result)
+}
+
+func executeWeatherForecast(ctx context.Context, location string, days int) string {
+	req := mcp.CallToolRequest{}
+	req.Params.Arguments = map[string]interface{}{"location": location, "days": float64(days)}
+	result, err := tools.WeatherForecast(ctx, req)
+	if err != nil {
+		return "Error: " + err.Error()
+	}
+	return extractText(result)
+}
+
+// === WEB ===
+
+func executeWebSearch(ctx context.Context, query string) string {
+	req := mcp.CallToolRequest{}
+	req.Params.Arguments = map[string]interface{}{"query": query}
+	result, err := tools.WebSearch(ctx, req)
+	if err != nil {
+		return "Error: " + err.Error()
+	}
+	return extractText(result)
+}
+
+func executeWebFetch(ctx context.Context, url string) string {
+	req := mcp.CallToolRequest{}
+	req.Params.Arguments = map[string]interface{}{"url": url}
+	result, err := tools.WebFetch(ctx, req)
+	if err != nil {
+		return "Error: " + err.Error()
+	}
+	return extractText(result)
+}
+
+// === CLIPBOARD ===
+
+func executeClipboardRead(ctx context.Context) string {
+	req := mcp.CallToolRequest{}
+	req.Params.Arguments = map[string]interface{}{}
+	result, err := tools.ClipboardRead(ctx, req)
+	if err != nil {
+		return "Error: " + err.Error()
+	}
+	return extractText(result)
+}
+
+func executeClipboardWrite(ctx context.Context, content string) string {
+	req := mcp.CallToolRequest{}
+	req.Params.Arguments = map[string]interface{}{"content": content}
+	result, err := tools.ClipboardWrite(ctx, req)
+	if err != nil {
+		return "Error: " + err.Error()
+	}
+	return extractText(result)
+}
+
+// === NOTIFICATION ===
+
+func executeNotificationSend(ctx context.Context, args map[string]any) string {
+	req := mcp.CallToolRequest{}
+	req.Params.Arguments = args
+	result, err := tools.NotificationSend(ctx, req)
+	if err != nil {
+		return "Error: " + err.Error()
+	}
+	return extractText(result)
+}
+
+// === SCREENSHOT ===
+
+func executeScreenshot(ctx context.Context, args map[string]any) string {
+	req := mcp.CallToolRequest{}
+	req.Params.Arguments = args
+	result, err := tools.ScreenshotCapture(ctx, req)
+	if err != nil {
+		return "Error: " + err.Error()
+	}
+	return extractText(result)
+}
+
+// === MUSIC ===
+
+func executeMusicPlay(ctx context.Context) string {
+	req := mcp.CallToolRequest{}
+	req.Params.Arguments = map[string]interface{}{}
+	result, err := tools.MusicPlay(ctx, req)
+	if err != nil {
+		return "Error: " + err.Error()
+	}
+	return extractText(result)
+}
+
+func executeMusicPause(ctx context.Context) string {
+	req := mcp.CallToolRequest{}
+	req.Params.Arguments = map[string]interface{}{}
+	result, err := tools.MusicPause(ctx, req)
+	if err != nil {
+		return "Error: " + err.Error()
+	}
+	return extractText(result)
+}
+
+func executeMusicNext(ctx context.Context) string {
+	req := mcp.CallToolRequest{}
+	req.Params.Arguments = map[string]interface{}{}
+	result, err := tools.MusicNext(ctx, req)
+	if err != nil {
+		return "Error: " + err.Error()
+	}
+	return extractText(result)
+}
+
+func executeMusicPrevious(ctx context.Context) string {
+	req := mcp.CallToolRequest{}
+	req.Params.Arguments = map[string]interface{}{}
+	result, err := tools.MusicPrevious(ctx, req)
+	if err != nil {
+		return "Error: " + err.Error()
+	}
+	return extractText(result)
+}
+
+func executeMusicNowPlaying(ctx context.Context) string {
+	req := mcp.CallToolRequest{}
+	req.Params.Arguments = map[string]interface{}{}
+	result, err := tools.MusicNowPlaying(ctx, req)
+	if err != nil {
+		return "Error: " + err.Error()
+	}
+	return extractText(result)
+}
+
+func executeMusicVolume(ctx context.Context, volume float64) string {
+	req := mcp.CallToolRequest{}
+	req.Params.Arguments = map[string]interface{}{"volume": volume}
+	result, err := tools.MusicSetVolume(ctx, req)
+	if err != nil {
+		return "Error: " + err.Error()
+	}
+	return extractText(result)
+}
+
+func executeMusicSearch(ctx context.Context, query string) string {
+	req := mcp.CallToolRequest{}
+	req.Params.Arguments = map[string]interface{}{"query": query}
+	result, err := tools.MusicSearch(ctx, req)
+	if err != nil {
+		return "Error: " + err.Error()
+	}
+	return extractText(result)
+}

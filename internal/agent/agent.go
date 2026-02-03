@@ -167,7 +167,7 @@ When users ask to open a website or URL, use the open_url tool.`
 // buildToolsList creates the tools list for the AI provider
 func (a *Agent) buildToolsList() []Tool {
 	return []Tool{
-		// File operations
+		// === FILE OPERATIONS ===
 		{
 			Name:        "file_read",
 			Description: "Read the contents of a file",
@@ -208,7 +208,8 @@ func (a *Agent) buildToolsList() []Tool {
 				"required": []string{"files"},
 			}),
 		},
-		// Calendar
+
+		// === CALENDAR ===
 		{
 			Name:        "calendar_today",
 			Description: "Get today's calendar events",
@@ -219,24 +220,274 @@ func (a *Agent) buildToolsList() []Tool {
 			Description: "List upcoming calendar events",
 			InputSchema: jsonSchema(map[string]any{
 				"type":       "object",
-				"properties": map[string]any{"days": map[string]string{"type": "number", "description": "Days ahead"}},
+				"properties": map[string]any{"days": map[string]string{"type": "number", "description": "Days ahead (default 7)"}},
 			}),
 		},
 		{
 			Name:        "calendar_create_event",
-			Description: "Create a calendar event",
+			Description: "Create a new calendar event",
 			InputSchema: jsonSchema(map[string]any{
 				"type": "object",
 				"properties": map[string]any{
 					"title":      map[string]string{"type": "string", "description": "Event title"},
 					"start_time": map[string]string{"type": "string", "description": "Start time (YYYY-MM-DD HH:MM)"},
-					"duration":   map[string]string{"type": "number", "description": "Duration in minutes"},
-					"calendar":   map[string]string{"type": "string", "description": "Calendar name"},
+					"duration":   map[string]string{"type": "number", "description": "Duration in minutes (default 60)"},
+					"calendar":   map[string]string{"type": "string", "description": "Calendar name (optional)"},
+					"location":   map[string]string{"type": "string", "description": "Event location (optional)"},
+					"notes":      map[string]string{"type": "string", "description": "Event notes (optional)"},
 				},
 				"required": []string{"title", "start_time"},
 			}),
 		},
-		// System
+		{
+			Name:        "calendar_search",
+			Description: "Search calendar events by keyword",
+			InputSchema: jsonSchema(map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"keyword": map[string]string{"type": "string", "description": "Search keyword"},
+					"days":    map[string]string{"type": "number", "description": "Days to search (default 30)"},
+				},
+				"required": []string{"keyword"},
+			}),
+		},
+		{
+			Name:        "calendar_delete",
+			Description: "Delete a calendar event by title",
+			InputSchema: jsonSchema(map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"title":    map[string]string{"type": "string", "description": "Event title to delete"},
+					"calendar": map[string]string{"type": "string", "description": "Calendar name (optional)"},
+					"date":     map[string]string{"type": "string", "description": "Date (YYYY-MM-DD) to narrow search (optional)"},
+				},
+				"required": []string{"title"},
+			}),
+		},
+
+		// === REMINDERS ===
+		{
+			Name:        "reminders_list",
+			Description: "List all pending reminders",
+			InputSchema: jsonSchema(map[string]any{"type": "object", "properties": map[string]any{}}),
+		},
+		{
+			Name:        "reminders_add",
+			Description: "Create a new reminder",
+			InputSchema: jsonSchema(map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"title": map[string]string{"type": "string", "description": "Reminder title"},
+					"list":  map[string]string{"type": "string", "description": "Reminder list name (default: Reminders)"},
+					"due":   map[string]string{"type": "string", "description": "Due date (YYYY-MM-DD or YYYY-MM-DD HH:MM)"},
+					"notes": map[string]string{"type": "string", "description": "Additional notes"},
+				},
+				"required": []string{"title"},
+			}),
+		},
+		{
+			Name:        "reminders_complete",
+			Description: "Mark a reminder as complete",
+			InputSchema: jsonSchema(map[string]any{
+				"type":       "object",
+				"properties": map[string]any{"title": map[string]string{"type": "string", "description": "Reminder title"}},
+				"required":   []string{"title"},
+			}),
+		},
+		{
+			Name:        "reminders_delete",
+			Description: "Delete a reminder",
+			InputSchema: jsonSchema(map[string]any{
+				"type":       "object",
+				"properties": map[string]any{"title": map[string]string{"type": "string", "description": "Reminder title"}},
+				"required":   []string{"title"},
+			}),
+		},
+
+		// === NOTES ===
+		{
+			Name:        "notes_list",
+			Description: "List notes in a folder",
+			InputSchema: jsonSchema(map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"folder": map[string]string{"type": "string", "description": "Folder name (default: Notes)"},
+					"limit":  map[string]string{"type": "number", "description": "Max notes to show (default 20)"},
+				},
+			}),
+		},
+		{
+			Name:        "notes_read",
+			Description: "Read a note's content",
+			InputSchema: jsonSchema(map[string]any{
+				"type":       "object",
+				"properties": map[string]any{"title": map[string]string{"type": "string", "description": "Note title"}},
+				"required":   []string{"title"},
+			}),
+		},
+		{
+			Name:        "notes_create",
+			Description: "Create a new note",
+			InputSchema: jsonSchema(map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"title":  map[string]string{"type": "string", "description": "Note title"},
+					"body":   map[string]string{"type": "string", "description": "Note content"},
+					"folder": map[string]string{"type": "string", "description": "Folder name (default: Notes)"},
+				},
+				"required": []string{"title"},
+			}),
+		},
+		{
+			Name:        "notes_search",
+			Description: "Search notes by keyword",
+			InputSchema: jsonSchema(map[string]any{
+				"type":       "object",
+				"properties": map[string]any{"keyword": map[string]string{"type": "string", "description": "Search keyword"}},
+				"required":   []string{"keyword"},
+			}),
+		},
+
+		// === WEATHER ===
+		{
+			Name:        "weather_current",
+			Description: "Get current weather for a location",
+			InputSchema: jsonSchema(map[string]any{
+				"type":       "object",
+				"properties": map[string]any{"location": map[string]string{"type": "string", "description": "City name or location (e.g., 'London', 'Tokyo')"}},
+			}),
+		},
+		{
+			Name:        "weather_forecast",
+			Description: "Get weather forecast for a location",
+			InputSchema: jsonSchema(map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"location": map[string]string{"type": "string", "description": "City name or location"},
+					"days":     map[string]string{"type": "number", "description": "Days to forecast (1-3)"},
+				},
+			}),
+		},
+
+		// === WEB ===
+		{
+			Name:        "web_search",
+			Description: "Search the web using DuckDuckGo",
+			InputSchema: jsonSchema(map[string]any{
+				"type":       "object",
+				"properties": map[string]any{"query": map[string]string{"type": "string", "description": "Search query"}},
+				"required":   []string{"query"},
+			}),
+		},
+		{
+			Name:        "web_fetch",
+			Description: "Fetch content from a URL",
+			InputSchema: jsonSchema(map[string]any{
+				"type":       "object",
+				"properties": map[string]any{"url": map[string]string{"type": "string", "description": "URL to fetch"}},
+				"required":   []string{"url"},
+			}),
+		},
+		{
+			Name:        "open_url",
+			Description: "Open a URL in the default web browser",
+			InputSchema: jsonSchema(map[string]any{
+				"type":       "object",
+				"properties": map[string]any{"url": map[string]string{"type": "string", "description": "URL to open"}},
+				"required":   []string{"url"},
+			}),
+		},
+
+		// === CLIPBOARD ===
+		{
+			Name:        "clipboard_read",
+			Description: "Read content from the clipboard",
+			InputSchema: jsonSchema(map[string]any{"type": "object", "properties": map[string]any{}}),
+		},
+		{
+			Name:        "clipboard_write",
+			Description: "Write content to the clipboard",
+			InputSchema: jsonSchema(map[string]any{
+				"type":       "object",
+				"properties": map[string]any{"content": map[string]string{"type": "string", "description": "Content to copy"}},
+				"required":   []string{"content"},
+			}),
+		},
+
+		// === NOTIFICATIONS ===
+		{
+			Name:        "notification_send",
+			Description: "Send a system notification",
+			InputSchema: jsonSchema(map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"title":    map[string]string{"type": "string", "description": "Notification title"},
+					"message":  map[string]string{"type": "string", "description": "Notification message"},
+					"subtitle": map[string]string{"type": "string", "description": "Subtitle (macOS only)"},
+				},
+				"required": []string{"title"},
+			}),
+		},
+
+		// === SCREENSHOT ===
+		{
+			Name:        "screenshot",
+			Description: "Capture a screenshot",
+			InputSchema: jsonSchema(map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"path": map[string]string{"type": "string", "description": "Save path (default: Desktop)"},
+					"type": map[string]string{"type": "string", "description": "Type: fullscreen, window, or selection"},
+				},
+			}),
+		},
+
+		// === MUSIC ===
+		{
+			Name:        "music_play",
+			Description: "Start or resume music playback",
+			InputSchema: jsonSchema(map[string]any{"type": "object", "properties": map[string]any{}}),
+		},
+		{
+			Name:        "music_pause",
+			Description: "Pause music playback",
+			InputSchema: jsonSchema(map[string]any{"type": "object", "properties": map[string]any{}}),
+		},
+		{
+			Name:        "music_next",
+			Description: "Skip to the next track",
+			InputSchema: jsonSchema(map[string]any{"type": "object", "properties": map[string]any{}}),
+		},
+		{
+			Name:        "music_previous",
+			Description: "Go to the previous track",
+			InputSchema: jsonSchema(map[string]any{"type": "object", "properties": map[string]any{}}),
+		},
+		{
+			Name:        "music_now_playing",
+			Description: "Get currently playing track info",
+			InputSchema: jsonSchema(map[string]any{"type": "object", "properties": map[string]any{}}),
+		},
+		{
+			Name:        "music_volume",
+			Description: "Set music volume (0-100)",
+			InputSchema: jsonSchema(map[string]any{
+				"type":       "object",
+				"properties": map[string]any{"volume": map[string]string{"type": "number", "description": "Volume level 0-100"}},
+				"required":   []string{"volume"},
+			}),
+		},
+		{
+			Name:        "music_search",
+			Description: "Search and play music in Spotify",
+			InputSchema: jsonSchema(map[string]any{
+				"type":       "object",
+				"properties": map[string]any{"query": map[string]string{"type": "string", "description": "Search query (song, artist, album)"}},
+				"required":   []string{"query"},
+			}),
+		},
+
+		// === SYSTEM ===
 		{
 			Name:        "system_info",
 			Description: "Get system information (CPU, memory, OS)",
@@ -260,16 +511,6 @@ func (a *Agent) buildToolsList() []Tool {
 			InputSchema: jsonSchema(map[string]any{
 				"type":       "object",
 				"properties": map[string]any{"filter": map[string]string{"type": "string", "description": "Filter by name"}},
-			}),
-		},
-		// Browser
-		{
-			Name:        "open_url",
-			Description: "Open a URL in the default web browser",
-			InputSchema: jsonSchema(map[string]any{
-				"type":       "object",
-				"properties": map[string]any{"url": map[string]string{"type": "string", "description": "URL to open"}},
-				"required":   []string{"url"},
 			}),
 		},
 	}
@@ -308,16 +549,7 @@ func (a *Agent) executeTool(ctx context.Context, name string, input json.RawMess
 // callToolDirect calls a tool directly
 func callToolDirect(ctx context.Context, name string, args map[string]any) string {
 	switch name {
-	case "system_info":
-		return executeSystemInfo(ctx)
-	case "calendar_today":
-		return executeCalendarToday(ctx)
-	case "calendar_list_events":
-		days := 7
-		if d, ok := args["days"].(float64); ok {
-			days = int(d)
-		}
-		return executeCalendarListEvents(ctx, days)
+	// File operations
 	case "file_list":
 		path := "."
 		if p, ok := args["path"].(string); ok {
@@ -334,20 +566,151 @@ func callToolDirect(ctx context.Context, name string, args map[string]any) strin
 			days = int(d)
 		}
 		return executeFileListOld(ctx, path, days)
-	case "shell_execute":
-		cmd := ""
-		if c, ok := args["command"].(string); ok {
-			cmd = c
+
+	// Calendar
+	case "calendar_today":
+		return executeCalendarToday(ctx)
+	case "calendar_list_events":
+		days := 7
+		if d, ok := args["days"].(float64); ok {
+			days = int(d)
 		}
-		return executeShell(ctx, cmd)
+		return executeCalendarListEvents(ctx, days)
+	case "calendar_create_event":
+		return executeCalendarCreate(ctx, args)
+	case "calendar_search":
+		return executeCalendarSearch(ctx, args)
+	case "calendar_delete":
+		return executeCalendarDelete(ctx, args)
+
+	// Reminders
+	case "reminders_list":
+		return executeRemindersToday(ctx)
+	case "reminders_add":
+		return executeRemindersAdd(ctx, args)
+	case "reminders_complete":
+		title := ""
+		if t, ok := args["title"].(string); ok {
+			title = t
+		}
+		return executeRemindersComplete(ctx, title)
+	case "reminders_delete":
+		title := ""
+		if t, ok := args["title"].(string); ok {
+			title = t
+		}
+		return executeRemindersDelete(ctx, title)
+
+	// Notes
+	case "notes_list":
+		return executeNotesList(ctx, args)
+	case "notes_read":
+		title := ""
+		if t, ok := args["title"].(string); ok {
+			title = t
+		}
+		return executeNotesRead(ctx, title)
+	case "notes_create":
+		return executeNotesCreate(ctx, args)
+	case "notes_search":
+		keyword := ""
+		if k, ok := args["keyword"].(string); ok {
+			keyword = k
+		}
+		return executeNotesSearch(ctx, keyword)
+
+	// Weather
+	case "weather_current":
+		location := ""
+		if l, ok := args["location"].(string); ok {
+			location = l
+		}
+		return executeWeatherCurrent(ctx, location)
+	case "weather_forecast":
+		location := ""
+		days := 3
+		if l, ok := args["location"].(string); ok {
+			location = l
+		}
+		if d, ok := args["days"].(float64); ok {
+			days = int(d)
+		}
+		return executeWeatherForecast(ctx, location, days)
+
+	// Web
+	case "web_search":
+		query := ""
+		if q, ok := args["query"].(string); ok {
+			query = q
+		}
+		return executeWebSearch(ctx, query)
+	case "web_fetch":
+		url := ""
+		if u, ok := args["url"].(string); ok {
+			url = u
+		}
+		return executeWebFetch(ctx, url)
 	case "open_url":
 		url := ""
 		if u, ok := args["url"].(string); ok {
 			url = u
 		}
 		return executeOpenURL(ctx, url)
+
+	// Clipboard
+	case "clipboard_read":
+		return executeClipboardRead(ctx)
+	case "clipboard_write":
+		content := ""
+		if c, ok := args["content"].(string); ok {
+			content = c
+		}
+		return executeClipboardWrite(ctx, content)
+
+	// Notification
+	case "notification_send":
+		return executeNotificationSend(ctx, args)
+
+	// Screenshot
+	case "screenshot":
+		return executeScreenshot(ctx, args)
+
+	// Music
+	case "music_play":
+		return executeMusicPlay(ctx)
+	case "music_pause":
+		return executeMusicPause(ctx)
+	case "music_next":
+		return executeMusicNext(ctx)
+	case "music_previous":
+		return executeMusicPrevious(ctx)
+	case "music_now_playing":
+		return executeMusicNowPlaying(ctx)
+	case "music_volume":
+		volume := 50.0
+		if v, ok := args["volume"].(float64); ok {
+			volume = v
+		}
+		return executeMusicVolume(ctx, volume)
+	case "music_search":
+		query := ""
+		if q, ok := args["query"].(string); ok {
+			query = q
+		}
+		return executeMusicSearch(ctx, query)
+
+	// System
+	case "system_info":
+		return executeSystemInfo(ctx)
+	case "shell_execute":
+		cmd := ""
+		if c, ok := args["command"].(string); ok {
+			cmd = c
+		}
+		return executeShell(ctx, cmd)
+
 	default:
-		return fmt.Sprintf("Tool '%s' not implemented in direct mode", name)
+		return fmt.Sprintf("Tool '%s' not implemented", name)
 	}
 }
 
