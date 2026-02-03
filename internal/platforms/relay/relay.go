@@ -313,6 +313,8 @@ func (p *Platform) readLoop() {
 		switch msgType.Type {
 		case "ping":
 			p.sendPong()
+		case "pong":
+			// Ignore pong responses (keepalive acknowledgments)
 		case "message":
 			p.handleMessage(message)
 		default:
