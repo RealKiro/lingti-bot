@@ -383,10 +383,12 @@ func (p *Platform) sendPong() {
 func (p *Platform) heartbeat() {
 	defer p.wg.Done()
 
-	// Send initial ping immediately to keep connection alive
+	// Short delay then send initial ping
+	time.Sleep(500 * time.Millisecond)
 	p.sendPing()
 
-	ticker := time.NewTicker(pingInterval)
+	// Send pings frequently to keep connection alive
+	ticker := time.NewTicker(3 * time.Second)
 	defer ticker.Stop()
 
 	for {
