@@ -16,13 +16,14 @@ import (
 )
 
 var (
-	slackBotToken  string
-	slackAppToken  string
-	feishuAppID    string
+	slackBotToken   string
+	slackAppToken   string
+	feishuAppID     string
 	feishuAppSecret string
-	claudeAPIKey   string
-	claudeBaseURL  string
-	claudeModel    string
+	aiProvider      string
+	aiAPIKey        string
+	aiBaseURL       string
+	aiModel         string
 )
 
 var routerCmd = &cobra.Command{
@@ -36,8 +37,10 @@ Required environment variables or flags:
   - SLACK_APP_TOKEN: Slack App Token (xapp-...)
   - FEISHU_APP_ID: Feishu App ID
   - FEISHU_APP_SECRET: Feishu App Secret
-  - ANTHROPIC_API_KEY: Claude API Key
-  - ANTHROPIC_BASE_URL: Custom API base URL (optional)`,
+  - AI_PROVIDER: AI provider (claude or deepseek, default: claude)
+  - AI_API_KEY: API Key for the AI provider
+  - AI_BASE_URL: Custom API base URL (optional)
+  - AI_MODEL: Model name (optional)`,
 	Run: runRouter,
 }
 
@@ -48,9 +51,10 @@ func init() {
 	routerCmd.Flags().StringVar(&slackAppToken, "slack-app-token", "", "Slack App Token (or SLACK_APP_TOKEN env)")
 	routerCmd.Flags().StringVar(&feishuAppID, "feishu-app-id", "", "Feishu App ID (or FEISHU_APP_ID env)")
 	routerCmd.Flags().StringVar(&feishuAppSecret, "feishu-app-secret", "", "Feishu App Secret (or FEISHU_APP_SECRET env)")
-	routerCmd.Flags().StringVar(&claudeAPIKey, "api-key", "", "Claude API Key (or ANTHROPIC_API_KEY env)")
-	routerCmd.Flags().StringVar(&claudeBaseURL, "base-url", "", "Custom API base URL (or ANTHROPIC_BASE_URL env)")
-	routerCmd.Flags().StringVar(&claudeModel, "model", "", "Claude model to use (or ANTHROPIC_MODEL env)")
+	routerCmd.Flags().StringVar(&aiProvider, "provider", "", "AI provider: claude or deepseek (or AI_PROVIDER env)")
+	routerCmd.Flags().StringVar(&aiAPIKey, "api-key", "", "AI API Key (or AI_API_KEY env)")
+	routerCmd.Flags().StringVar(&aiBaseURL, "base-url", "", "Custom API base URL (or AI_BASE_URL env)")
+	routerCmd.Flags().StringVar(&aiModel, "model", "", "Model name (or AI_MODEL env)")
 }
 
 func runRouter(cmd *cobra.Command, args []string) {
@@ -67,27 +71,41 @@ func runRouter(cmd *cobra.Command, args []string) {
 	if feishuAppSecret == "" {
 		feishuAppSecret = os.Getenv("FEISHU_APP_SECRET")
 	}
-	if claudeAPIKey == "" {
-		claudeAPIKey = os.Getenv("ANTHROPIC_API_KEY")
+	if aiProvider == "" {
+		aiProvider = os.Getenv("AI_PROVIDER")
 	}
-	if claudeBaseURL == "" {
-		claudeBaseURL = os.Getenv("ANTHROPIC_BASE_URL")
+	if aiAPIKey == "" {
+		aiAPIKey = os.Getenv("AI_API_KEY")
+		// Fallback to legacy env var
+		if aiAPIKey == "" {
+			aiAPIKey = os.Getenv("ANTHROPIC_API_KEY")
+		}
 	}
-	if claudeModel == "" {
-		claudeModel = os.Getenv("ANTHROPIC_MODEL")
+	if aiBaseURL == "" {
+		aiBaseURL = os.Getenv("AI_BASE_URL")
+		if aiBaseURL == "" {
+			aiBaseURL = os.Getenv("ANTHROPIC_BASE_URL")
+		}
+	}
+	if aiModel == "" {
+		aiModel = os.Getenv("AI_MODEL")
+		if aiModel == "" {
+			aiModel = os.Getenv("ANTHROPIC_MODEL")
+		}
 	}
 
 	// Validate required tokens
-	if claudeAPIKey == "" {
-		fmt.Fprintln(os.Stderr, "Error: ANTHROPIC_API_KEY is required")
+	if aiAPIKey == "" {
+		fmt.Fprintln(os.Stderr, "Error: AI_API_KEY is required")
 		os.Exit(1)
 	}
 
 	// Create the AI agent
 	aiAgent, err := agent.New(agent.Config{
-		APIKey:  claudeAPIKey,
-		BaseURL: claudeBaseURL,
-		Model:   claudeModel,
+		Provider: aiProvider,
+		APIKey:   aiAPIKey,
+		BaseURL:  aiBaseURL,
+		Model:    aiModel,
 	})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error creating agent: %v\n", err)
@@ -136,7 +154,20 @@ func runRouter(cmd *cobra.Command, args []string) {
 		os.Exit(1)
 	}
 
-	log.Println("Router started. Press Ctrl+C to stop.")
+	providerName := aiProvider
+	if providerName == "" {
+		providerName = "claude"
+	}
+	modelName := aiModel
+	if modelName == "" {
+		if providerName == "deepseek" {
+			modelName = "deepseek-chat"
+		} else {
+			modelName = "claude-sonnet-4-20250514"
+		}
+	}
+	log.Printf("Router started. AI Provider: %s, Model: %s", providerName, modelName)
+	log.Println("Press Ctrl+C to stop.")
 
 	// Wait for shutdown signal
 	sigCh := make(chan os.Signal, 1)

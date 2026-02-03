@@ -7,48 +7,59 @@ import (
 	"log"
 	"strings"
 
-	"github.com/liushuangls/go-anthropic/v2"
 	"github.com/pltanton/lingti-bot/internal/router"
 )
 
-// Agent processes messages using Claude and MCP tools
+// Agent processes messages using AI providers and tools
 type Agent struct {
-	client *anthropic.Client
-	model  string
+	provider Provider
 }
 
 // Config holds agent configuration
 type Config struct {
-	APIKey  string
-	BaseURL string // Custom API base URL (optional)
-	Model   string // Default: claude-sonnet-4-20250514
+	Provider string // "claude" or "deepseek" (default: "claude")
+	APIKey   string
+	BaseURL  string // Custom API base URL (optional)
+	Model    string // Model name (optional, uses provider default)
 }
 
-// New creates a new Agent
+// New creates a new Agent with the specified provider
 func New(cfg Config) (*Agent, error) {
 	if cfg.APIKey == "" {
 		return nil, fmt.Errorf("API key is required")
 	}
 
-	if cfg.Model == "" {
-		cfg.Model = "claude-sonnet-4-20250514"
-	}
-
-	// Create client with optional custom base URL
-	var client *anthropic.Client
-	if cfg.BaseURL != "" {
-		client = anthropic.NewClient(cfg.APIKey, anthropic.WithBaseURL(cfg.BaseURL))
-	} else {
-		client = anthropic.NewClient(cfg.APIKey)
+	provider, err := createProvider(cfg)
+	if err != nil {
+		return nil, err
 	}
 
 	return &Agent{
-		client: client,
-		model:  cfg.Model,
+		provider: provider,
 	}, nil
 }
 
-// handleBuiltinCommand handles special commands without calling Claude
+// createProvider creates the appropriate AI provider based on config
+func createProvider(cfg Config) (Provider, error) {
+	switch strings.ToLower(cfg.Provider) {
+	case "deepseek":
+		return NewDeepSeekProvider(DeepSeekConfig{
+			APIKey:  cfg.APIKey,
+			BaseURL: cfg.BaseURL,
+			Model:   cfg.Model,
+		})
+	case "claude", "anthropic", "":
+		return NewClaudeProvider(ClaudeConfig{
+			APIKey:  cfg.APIKey,
+			BaseURL: cfg.BaseURL,
+			Model:   cfg.Model,
+		})
+	default:
+		return nil, fmt.Errorf("unknown provider: %s (supported: claude, deepseek)", cfg.Provider)
+	}
+}
+
+// handleBuiltinCommand handles special commands without calling AI
 func (a *Agent) handleBuiltinCommand(msg router.Message) (router.Response, bool) {
 	text := strings.TrimSpace(strings.ToLower(msg.Text))
 
@@ -69,23 +80,21 @@ func (a *Agent) handleBuiltinCommand(msg router.Message) (router.Response, bool)
 
 // HandleMessage processes a message and returns a response
 func (a *Agent) HandleMessage(ctx context.Context, msg router.Message) (router.Response, error) {
-	log.Printf("[Agent] Processing message from %s: %s", msg.Username, msg.Text)
+	log.Printf("[Agent] Processing message from %s: %s (provider: %s)", msg.Username, msg.Text, a.provider.Name())
 
 	// Handle built-in commands
 	if resp, handled := a.handleBuiltinCommand(msg); handled {
 		return resp, nil
 	}
 
-	// Build the tools list from MCP server
+	// Build the tools list
 	tools := a.buildToolsList()
 
-	// Create the message request
-	messages := []anthropic.Message{
+	// Create initial messages
+	messages := []Message{
 		{
-			Role: anthropic.RoleUser,
-			Content: []anthropic.MessageContent{
-				anthropic.NewTextMessageContent(msg.Text),
-			},
+			Role:    "user",
+			Content: msg.Text,
 		},
 	}
 
@@ -102,86 +111,79 @@ func (a *Agent) HandleMessage(ctx context.Context, msg router.Message) (router.R
 When users ask you to do something, use the appropriate tools. Be concise in your responses.
 Always confirm before performing destructive actions (delete, kill process, etc.).`
 
-	// Call Claude API with tools
-	resp, err := a.client.CreateMessages(ctx, anthropic.MessagesRequest{
-		Model:     anthropic.Model(a.model),
-		MaxTokens: 4096,
-		System:    systemPrompt,
-		Messages:  messages,
-		Tools:     tools,
+	// Call AI provider
+	resp, err := a.provider.Chat(ctx, ChatRequest{
+		Messages:     messages,
+		SystemPrompt: systemPrompt,
+		Tools:        tools,
+		MaxTokens:    4096,
 	})
-
 	if err != nil {
-		return router.Response{}, fmt.Errorf("API error: %w", err)
+		return router.Response{}, fmt.Errorf("AI error: %w", err)
 	}
 
 	// Handle tool use if needed
-	for resp.StopReason == anthropic.MessagesStopReasonToolUse {
+	for resp.FinishReason == "tool_use" {
 		// Process tool calls
-		toolResults := a.processToolCalls(ctx, resp.Content)
+		toolResults := a.processToolCalls(ctx, resp.ToolCalls)
 
-		// Add assistant response and tool results to messages
-		messages = append(messages, anthropic.Message{
-			Role:    anthropic.RoleAssistant,
-			Content: resp.Content,
+		// Add assistant response with tool calls
+		messages = append(messages, Message{
+			Role:      "assistant",
+			Content:   resp.Content,
+			ToolCalls: resp.ToolCalls,
 		})
-		messages = append(messages, anthropic.Message{
-			Role:    anthropic.RoleUser,
-			Content: toolResults,
-		})
+
+		// Add tool results
+		for _, result := range toolResults {
+			messages = append(messages, Message{
+				Role:       "user",
+				ToolResult: &result,
+			})
+		}
 
 		// Continue the conversation
-		resp, err = a.client.CreateMessages(ctx, anthropic.MessagesRequest{
-			Model:     anthropic.Model(a.model),
-			MaxTokens: 4096,
-			System:    systemPrompt,
-			Messages:  messages,
-			Tools:     tools,
+		resp, err = a.provider.Chat(ctx, ChatRequest{
+			Messages:     messages,
+			SystemPrompt: systemPrompt,
+			Tools:        tools,
+			MaxTokens:    4096,
 		})
-
 		if err != nil {
-			return router.Response{}, fmt.Errorf("API error: %w", err)
+			return router.Response{}, fmt.Errorf("AI error: %w", err)
 		}
 	}
 
-	// Extract text response
-	var responseText string
-	for _, content := range resp.Content {
-		if content.Type == anthropic.MessagesContentTypeText && content.Text != nil {
-			responseText += *content.Text
-		}
-	}
-
-	return router.Response{Text: responseText}, nil
+	return router.Response{Text: resp.Content}, nil
 }
 
-// buildToolsList creates the tools list for Claude
-func (a *Agent) buildToolsList() []anthropic.ToolDefinition {
-	return []anthropic.ToolDefinition{
+// buildToolsList creates the tools list for the AI provider
+func (a *Agent) buildToolsList() []Tool {
+	return []Tool{
 		// File operations
 		{
 			Name:        "file_read",
 			Description: "Read the contents of a file",
-			InputSchema: jsonSchema(map[string]interface{}{
+			InputSchema: jsonSchema(map[string]any{
 				"type":       "object",
-				"properties": map[string]interface{}{"path": map[string]string{"type": "string", "description": "Path to the file"}},
+				"properties": map[string]any{"path": map[string]string{"type": "string", "description": "Path to the file"}},
 				"required":   []string{"path"},
 			}),
 		},
 		{
 			Name:        "file_list",
 			Description: "List contents of a directory",
-			InputSchema: jsonSchema(map[string]interface{}{
+			InputSchema: jsonSchema(map[string]any{
 				"type":       "object",
-				"properties": map[string]interface{}{"path": map[string]string{"type": "string", "description": "Directory path"}},
+				"properties": map[string]any{"path": map[string]string{"type": "string", "description": "Directory path"}},
 			}),
 		},
 		{
 			Name:        "file_list_old",
 			Description: "List files not modified for specified days",
-			InputSchema: jsonSchema(map[string]interface{}{
+			InputSchema: jsonSchema(map[string]any{
 				"type": "object",
-				"properties": map[string]interface{}{
+				"properties": map[string]any{
 					"path": map[string]string{"type": "string", "description": "Directory path"},
 					"days": map[string]string{"type": "number", "description": "Minimum days since modification"},
 				},
@@ -191,10 +193,10 @@ func (a *Agent) buildToolsList() []anthropic.ToolDefinition {
 		{
 			Name:        "file_trash",
 			Description: "Move files to Trash",
-			InputSchema: jsonSchema(map[string]interface{}{
+			InputSchema: jsonSchema(map[string]any{
 				"type": "object",
-				"properties": map[string]interface{}{
-					"files": map[string]interface{}{"type": "array", "items": map[string]string{"type": "string"}, "description": "File paths to trash"},
+				"properties": map[string]any{
+					"files": map[string]any{"type": "array", "items": map[string]string{"type": "string"}, "description": "File paths to trash"},
 				},
 				"required": []string{"files"},
 			}),
@@ -203,22 +205,22 @@ func (a *Agent) buildToolsList() []anthropic.ToolDefinition {
 		{
 			Name:        "calendar_today",
 			Description: "Get today's calendar events",
-			InputSchema: jsonSchema(map[string]interface{}{"type": "object", "properties": map[string]interface{}{}}),
+			InputSchema: jsonSchema(map[string]any{"type": "object", "properties": map[string]any{}}),
 		},
 		{
 			Name:        "calendar_list_events",
 			Description: "List upcoming calendar events",
-			InputSchema: jsonSchema(map[string]interface{}{
+			InputSchema: jsonSchema(map[string]any{
 				"type":       "object",
-				"properties": map[string]interface{}{"days": map[string]string{"type": "number", "description": "Days ahead"}},
+				"properties": map[string]any{"days": map[string]string{"type": "number", "description": "Days ahead"}},
 			}),
 		},
 		{
 			Name:        "calendar_create_event",
 			Description: "Create a calendar event",
-			InputSchema: jsonSchema(map[string]interface{}{
+			InputSchema: jsonSchema(map[string]any{
 				"type": "object",
-				"properties": map[string]interface{}{
+				"properties": map[string]any{
 					"title":      map[string]string{"type": "string", "description": "Event title"},
 					"start_time": map[string]string{"type": "string", "description": "Start time (YYYY-MM-DD HH:MM)"},
 					"duration":   map[string]string{"type": "number", "description": "Duration in minutes"},
@@ -231,14 +233,14 @@ func (a *Agent) buildToolsList() []anthropic.ToolDefinition {
 		{
 			Name:        "system_info",
 			Description: "Get system information (CPU, memory, OS)",
-			InputSchema: jsonSchema(map[string]interface{}{"type": "object", "properties": map[string]interface{}{}}),
+			InputSchema: jsonSchema(map[string]any{"type": "object", "properties": map[string]any{}}),
 		},
 		{
 			Name:        "shell_execute",
 			Description: "Execute a shell command",
-			InputSchema: jsonSchema(map[string]interface{}{
+			InputSchema: jsonSchema(map[string]any{
 				"type": "object",
-				"properties": map[string]interface{}{
+				"properties": map[string]any{
 					"command": map[string]string{"type": "string", "description": "Command to execute"},
 					"timeout": map[string]string{"type": "number", "description": "Timeout in seconds"},
 				},
@@ -248,28 +250,25 @@ func (a *Agent) buildToolsList() []anthropic.ToolDefinition {
 		{
 			Name:        "process_list",
 			Description: "List running processes",
-			InputSchema: jsonSchema(map[string]interface{}{
+			InputSchema: jsonSchema(map[string]any{
 				"type":       "object",
-				"properties": map[string]interface{}{"filter": map[string]string{"type": "string", "description": "Filter by name"}},
+				"properties": map[string]any{"filter": map[string]string{"type": "string", "description": "Filter by name"}},
 			}),
 		},
 	}
 }
 
 // processToolCalls executes tool calls and returns results
-func (a *Agent) processToolCalls(ctx context.Context, content []anthropic.MessageContent) []anthropic.MessageContent {
-	var results []anthropic.MessageContent
+func (a *Agent) processToolCalls(ctx context.Context, toolCalls []ToolCall) []ToolResult {
+	results := make([]ToolResult, 0, len(toolCalls))
 
-	for _, c := range content {
-		if c.Type == anthropic.MessagesContentTypeToolUse {
-			toolName := c.Name
-			toolID := c.ID
-
-			// Execute the tool via MCP
-			result := a.executeTool(ctx, toolName, c.Input)
-
-			results = append(results, anthropic.NewToolResultMessageContent(toolID, result, false))
-		}
+	for _, tc := range toolCalls {
+		result := a.executeTool(ctx, tc.Name, tc.Input)
+		results = append(results, ToolResult{
+			ToolCallID: tc.ID,
+			Content:    result,
+			IsError:    false,
+		})
 	}
 
 	return results
@@ -280,22 +279,17 @@ func (a *Agent) executeTool(ctx context.Context, name string, input json.RawMess
 	log.Printf("[Agent] Executing tool: %s", name)
 
 	// Parse input arguments
-	var args map[string]interface{}
+	var args map[string]any
 	if err := json.Unmarshal(input, &args); err != nil {
 		return fmt.Sprintf("Error parsing arguments: %v", err)
 	}
 
 	// Call tools directly
-	result := callToolDirect(ctx, name, args)
-
-	return result
+	return callToolDirect(ctx, name, args)
 }
 
-// callToolDirect calls a tool directly (simplified implementation)
-func callToolDirect(ctx context.Context, name string, args map[string]interface{}) string {
-	// Import and call tools directly
-	// This is a simplified approach - a full implementation would use MCP protocol
-
+// callToolDirect calls a tool directly
+func callToolDirect(ctx context.Context, name string, args map[string]any) string {
 	switch name {
 	case "system_info":
 		return executeSystemInfo(ctx)
@@ -334,7 +328,7 @@ func callToolDirect(ctx context.Context, name string, args map[string]interface{
 	}
 }
 
-func jsonSchema(schema map[string]interface{}) json.RawMessage {
+func jsonSchema(schema map[string]any) json.RawMessage {
 	data, _ := json.Marshal(schema)
 	return data
 }

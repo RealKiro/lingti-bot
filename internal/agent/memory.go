@@ -3,8 +3,6 @@ package agent
 import (
 	"sync"
 	"time"
-
-	"github.com/liushuangls/go-anthropic/v2"
 )
 
 // ConversationMemory stores conversation history per user/channel
@@ -17,7 +15,7 @@ type ConversationMemory struct {
 
 // Conversation holds messages for a single conversation
 type Conversation struct {
-	Messages  []anthropic.Message
+	Messages  []Message
 	UpdatedAt time.Time
 }
 
@@ -43,7 +41,7 @@ func NewMemory(maxMessages int, ttl time.Duration) *ConversationMemory {
 }
 
 // GetHistory returns the conversation history for a key (user+channel)
-func (m *ConversationMemory) GetHistory(key string) []anthropic.Message {
+func (m *ConversationMemory) GetHistory(key string) []Message {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -58,20 +56,20 @@ func (m *ConversationMemory) GetHistory(key string) []anthropic.Message {
 	}
 
 	// Return a copy
-	messages := make([]anthropic.Message, len(conv.Messages))
+	messages := make([]Message, len(conv.Messages))
 	copy(messages, conv.Messages)
 	return messages
 }
 
 // AddMessage adds a message to the conversation history
-func (m *ConversationMemory) AddMessage(key string, msg anthropic.Message) {
+func (m *ConversationMemory) AddMessage(key string, msg Message) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	conv, ok := m.conversations[key]
 	if !ok {
 		conv = &Conversation{
-			Messages: make([]anthropic.Message, 0),
+			Messages: make([]Message, 0),
 		}
 		m.conversations[key] = conv
 	}
@@ -91,14 +89,14 @@ func (m *ConversationMemory) AddMessage(key string, msg anthropic.Message) {
 }
 
 // AddExchange adds both user and assistant messages
-func (m *ConversationMemory) AddExchange(key string, userMsg, assistantMsg anthropic.Message) {
+func (m *ConversationMemory) AddExchange(key string, userMsg, assistantMsg Message) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	conv, ok := m.conversations[key]
 	if !ok {
 		conv = &Conversation{
-			Messages: make([]anthropic.Message, 0),
+			Messages: make([]Message, 0),
 		}
 		m.conversations[key] = conv
 	}

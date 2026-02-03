@@ -32,6 +32,8 @@ type Config struct {
 	Platform   string // "feishu" or "slack"
 	ServerURL  string // WebSocket URL (default: wss://bot.lingti.com/ws)
 	WebhookURL string // Webhook URL (default: https://bot.lingti.com/webhook)
+	AIProvider string // AI provider name (e.g., "claude", "deepseek")
+	AIModel    string // AI model name
 }
 
 // Platform implements router.Platform for cloud relay
@@ -55,6 +57,8 @@ type AuthMessage struct {
 	UserID        string `json:"user_id"`
 	Platform      string `json:"platform"`
 	ClientVersion string `json:"client_version"`
+	AIProvider    string `json:"ai_provider,omitempty"`
+	AIModel       string `json:"ai_model,omitempty"`
 }
 
 // AuthResult is the response to authentication
@@ -221,6 +225,8 @@ func (p *Platform) connect() error {
 		UserID:        p.config.UserID,
 		Platform:      p.config.Platform,
 		ClientVersion: ClientVersion,
+		AIProvider:    p.config.AIProvider,
+		AIModel:       p.config.AIModel,
 	}
 
 	conn.SetWriteDeadline(time.Now().Add(writeTimeout))
