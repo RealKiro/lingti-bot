@@ -6,13 +6,19 @@ GOBIN := $(GOBASE)/dist
 GOARCH ?= $(shell go env GOARCH)
 GOOS ?= $(shell go env GOOS)
 LDFLAGS=-ldflags "-X github.com/pltanton/lingti-bot/internal/mcp.ServerVersion=$(VERSION) -X main.Build=$(BUILD) -w -s"
+LDFLAGS_DEBUG=-ldflags "-X github.com/pltanton/lingti-bot/internal/mcp.ServerVersion=$(VERSION) -X main.Build=$(BUILD) -X github.com/pltanton/lingti-bot/internal/debug.enabled=true"
 GOBUILD=go build $(LDFLAGS)
+GOBUILD_DEBUG=go build $(LDFLAGS_DEBUG)
 
-.PHONY: all build clean install uninstall test darwin-all darwin-arm64 darwin-amd64 darwin-universal linux-all linux-amd64 linux-arm64 windows-all windows-amd64 windows-arm64
+.PHONY: all build build-debug clean install uninstall test darwin-all darwin-arm64 darwin-amd64 darwin-universal linux-all linux-amd64 linux-arm64 windows-all windows-amd64 windows-arm64
 
 # Default: build for current platform
 build:
 	$(GOBUILD) -o $(GOBIN)/$(PROJECTNAME) .
+
+# Debug build with verbose logging
+build-debug:
+	$(GOBUILD_DEBUG) -o $(GOBIN)/$(PROJECTNAME)-debug .
 
 # Build all platforms
 all: darwin-all linux-all windows-all

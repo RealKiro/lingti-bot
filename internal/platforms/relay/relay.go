@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/pltanton/lingti-bot/internal/debug"
 	"github.com/pltanton/lingti-bot/internal/router"
 )
 
@@ -210,14 +211,17 @@ func (p *Platform) Send(ctx context.Context, channelID string, resp router.Respo
 
 // connect establishes WebSocket connection and authenticates
 func (p *Platform) connect() error {
+	debug.Log("Connecting to %s", p.config.ServerURL)
+
 	dialer := websocket.Dialer{
 		HandshakeTimeout: 10 * time.Second,
 	}
 
-	conn, _, err := dialer.DialContext(p.ctx, p.config.ServerURL, nil)
+	conn, resp, err := dialer.DialContext(p.ctx, p.config.ServerURL, nil)
 	if err != nil {
 		return fmt.Errorf("failed to connect: %w", err)
 	}
+	debug.Log("WebSocket connected, status: %s", resp.Status)
 
 	// Send authentication
 	authMsg := AuthMessage{
@@ -229,6 +233,7 @@ func (p *Platform) connect() error {
 		AIModel:       p.config.AIModel,
 	}
 
+	debug.Log("Sending auth message")
 	conn.SetWriteDeadline(time.Now().Add(writeTimeout))
 	if err := conn.WriteJSON(authMsg); err != nil {
 		conn.Close()
@@ -236,12 +241,14 @@ func (p *Platform) connect() error {
 	}
 
 	// Wait for auth response
+	debug.Log("Waiting for auth response")
 	conn.SetReadDeadline(time.Now().Add(readTimeout))
 	var authResult AuthResult
 	if err := conn.ReadJSON(&authResult); err != nil {
 		conn.Close()
 		return fmt.Errorf("failed to read auth response: %w", err)
 	}
+	debug.Log("Auth response: success=%v, session=%s", authResult.Success, authResult.SessionID)
 
 	if authResult.Type != "auth_result" {
 		conn.Close()
@@ -254,9 +261,18 @@ func (p *Platform) connect() error {
 	}
 
 	// Set up pong handler to reset read deadline
-	conn.SetPongHandler(func(string) error {
+	conn.SetPongHandler(func(appData string) error {
+		debug.Log("Received pong")
 		conn.SetReadDeadline(time.Now().Add(readTimeout))
 		return nil
+	})
+
+	// Set up ping handler
+	conn.SetPingHandler(func(appData string) error {
+		debug.Log("Received ping from server")
+		conn.SetReadDeadline(time.Now().Add(readTimeout))
+		conn.SetWriteDeadline(time.Now().Add(writeTimeout))
+		return conn.WriteMessage(websocket.PongMessage, []byte(appData))
 	})
 
 	p.connMu.Lock()
@@ -277,6 +293,7 @@ func (p *Platform) readLoop() {
 	for {
 		select {
 		case <-p.ctx.Done():
+			debug.Log("Context done, exiting readLoop")
 			return
 		default:
 		}
@@ -286,18 +303,21 @@ func (p *Platform) readLoop() {
 		p.connMu.Unlock()
 
 		if conn == nil {
+			debug.Log("No connection, reconnecting")
 			p.reconnect(&retryDelay)
 			continue
 		}
 
+		debug.Log("Waiting for message (timeout: %v)", readTimeout)
 		conn.SetReadDeadline(time.Now().Add(readTimeout))
-		_, message, err := conn.ReadMessage()
+		msgType, message, err := conn.ReadMessage()
 		if err != nil {
 			if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
 				log.Printf("[Relay] Connection closed normally")
 				return
 			}
 
+			debug.Log("Read error (msgType=%d): %v", msgType, err)
 			log.Printf("[Relay] Read error: %v", err)
 			p.connMu.Lock()
 			if p.conn != nil {
@@ -310,27 +330,34 @@ func (p *Platform) readLoop() {
 			continue
 		}
 
+		debug.Log("Received message (type=%d, len=%d)", msgType, len(message))
+
 		// Reset retry delay on successful read
 		retryDelay = initialRetryDelay
 
 		// Parse message type
-		var msgType struct {
+		var jsonMsg struct {
 			Type string `json:"type"`
 		}
-		if err := json.Unmarshal(message, &msgType); err != nil {
+		if err := json.Unmarshal(message, &jsonMsg); err != nil {
+			debug.Log("Failed to parse JSON: %v, raw: %s", err, string(message))
 			log.Printf("[Relay] Failed to parse message type: %v", err)
 			continue
 		}
 
-		switch msgType.Type {
+		debug.Log("Message type: %s", jsonMsg.Type)
+
+		switch jsonMsg.Type {
 		case "ping":
+			debug.Log("Received app-level ping, sending pong")
 			p.sendPong()
 		case "pong":
-			// Ignore pong responses (keepalive acknowledgments)
+			debug.Log("Received app-level pong")
 		case "message":
+			debug.Log("Received message, handling")
 			p.handleMessage(message)
 		default:
-			log.Printf("[Relay] Unknown message type: %s", msgType.Type)
+			log.Printf("[Relay] Unknown message type: %s", jsonMsg.Type)
 		}
 	}
 }
@@ -383,6 +410,8 @@ func (p *Platform) sendPong() {
 func (p *Platform) heartbeat() {
 	defer p.wg.Done()
 
+	debug.Log("Heartbeat started, waiting 500ms before first ping")
+
 	// Short delay then send initial ping
 	time.Sleep(500 * time.Millisecond)
 	p.sendPing()
@@ -394,6 +423,7 @@ func (p *Platform) heartbeat() {
 	for {
 		select {
 		case <-p.ctx.Done():
+			debug.Log("Heartbeat stopped (context done)")
 			return
 		case <-ticker.C:
 			p.sendPing()
@@ -407,13 +437,18 @@ func (p *Platform) sendPing() {
 	p.connMu.Unlock()
 
 	if conn == nil {
+		debug.Log("sendPing: no connection")
 		return
 	}
 
+	debug.Log("Sending WebSocket ping")
 	// Use WebSocket-level ping for better proxy/load balancer compatibility
 	conn.SetWriteDeadline(time.Now().Add(writeTimeout))
 	if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+		debug.Log("sendPing error: %v", err)
 		log.Printf("[Relay] Failed to send ping: %v", err)
+	} else {
+		debug.Log("Ping sent successfully")
 	}
 }
 
