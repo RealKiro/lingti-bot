@@ -1,6 +1,6 @@
 # lingti-bot (灵小缇)
 
-> 🚀 **更适合中国宝宝体质的 AI Bot，让 AI Bot 接入更简单**
+> 🚀 **[更适合中国宝宝体质](docs/为何更适合中国宝宝体质.md)的 AI Bot，让 AI Bot 接入更简单**
 
 [![Go Version](https://img.shields.io/badge/Go-1.23+-00ADD8?style=flat&logo=go)](https://go.dev/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
