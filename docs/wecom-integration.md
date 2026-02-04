@@ -63,6 +63,7 @@ lingti-bot router \
   --wecom-token YOUR_TOKEN \
   --wecom-aes-key YOUR_AES_KEY \
   --wecom-port 8080 \
+  --provider deepseek \
   --model deepseek-chat \
   --api-key YOUR_API_KEY \
   --base-url "https://api.deepseek.com/v1"
@@ -83,6 +84,7 @@ export WECOM_SECRET="your-secret"
 export WECOM_TOKEN="your-callback-token"
 export WECOM_AES_KEY="your-encoding-aes-key"
 export WECOM_PORT="8080"
+export AI_PROVIDER="deepseek"
 export AI_API_KEY="your-api-key"
 export AI_BASE_URL="https://api.deepseek.com/v1"
 export AI_MODEL="deepseek-chat"
@@ -166,6 +168,10 @@ lingti-bot router --log verbose ...
 | `--wecom-token` | `WECOM_TOKEN` | 回调 Token |
 | `--wecom-aes-key` | `WECOM_AES_KEY` | 回调 EncodingAESKey |
 | `--wecom-port` | `WECOM_PORT` | 回调服务端口 (默认 8080) |
+| `--provider` | `AI_PROVIDER` | AI 提供商: claude, deepseek, kimi |
+| `--model` | `AI_MODEL` | 模型名称 |
+| `--api-key` | `AI_API_KEY` | API 密钥 |
+| `--base-url` | `AI_BASE_URL` | API 端点 |
 
 ## 后台运行
 
@@ -196,6 +202,7 @@ Environment="WECOM_SECRET=your-secret"
 Environment="WECOM_TOKEN=your-token"
 Environment="WECOM_AES_KEY=your-aes-key"
 Environment="WECOM_PORT=8080"
+Environment="AI_PROVIDER=deepseek"
 Environment="AI_API_KEY=your-api-key"
 Environment="AI_BASE_URL=https://api.deepseek.com/v1"
 Environment="AI_MODEL=deepseek-chat"
