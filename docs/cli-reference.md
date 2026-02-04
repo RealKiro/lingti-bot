@@ -293,6 +293,7 @@ lingti-bot talk [flags]
 | `--voice-api-key` | `VOICE_API_KEY` | | Voice API key |
 | `--wake-word` | `WAKE_WORD` | | Wake word for activation (e.g., "hey lingti") |
 | `--continuous` | | `false` | Keep listening after each response |
+| `--brief` | | `true` | Brief voice mode: print full text, speak only "已完成" |
 | `--voice` | | | Default voice name for TTS |
 | `--provider` | `AI_PROVIDER` | `claude` | AI provider: claude, deepseek, kimi |
 | `--api-key` | `AI_API_KEY` | | AI API key (required) |
@@ -302,8 +303,14 @@ lingti-bot talk [flags]
 **Examples:**
 
 ```bash
-# Basic talk mode
+# Basic talk mode (brief voice: print full text, speak "已完成")
 lingti-bot talk \
+  --provider claude \
+  --api-key sk-ant-xxx
+
+# Full voice output (speak entire response)
+lingti-bot talk \
+  --brief=false \
   --provider claude \
   --api-key sk-ant-xxx
 

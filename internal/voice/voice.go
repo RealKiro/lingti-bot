@@ -50,6 +50,7 @@ type TalkMode struct {
 	cancel         context.CancelFunc
 	wakeWord       string
 	continuousMode bool
+	briefVoice     bool
 }
 
 // Config holds voice configuration
@@ -60,6 +61,7 @@ type Config struct {
 	ContinuousMode bool   // Keep listening after response
 	DefaultVoice   string // Default voice for TTS
 	DefaultLang    string // Default language
+	BriefVoice     bool   // Only speak brief notification, print full text
 }
 
 // NewTalkMode creates a new talk mode session
@@ -85,6 +87,7 @@ func NewTalkMode(cfg Config, handler func(text string) (string, error)) (*TalkMo
 		messageHandler: handler,
 		wakeWord:       cfg.WakeWord,
 		continuousMode: cfg.ContinuousMode,
+		briefVoice:     cfg.BriefVoice,
 	}, nil
 }
 
@@ -178,9 +181,23 @@ func (t *TalkMode) ProcessAudio(ctx context.Context, audio []byte) (string, erro
 		return "", fmt.Errorf("message handler failed: %w", err)
 	}
 
-	// Speak the response
-	if err := t.Speak(ctx, response); err != nil {
-		log.Printf("[Voice] TTS failed: %v", err)
+	// Print full response as text
+	fmt.Println()
+	fmt.Println("🤖 Assistant:")
+	fmt.Println(response)
+	fmt.Println()
+
+	// Speak the response (brief notification or full response)
+	if t.briefVoice {
+		// Only speak brief notification
+		if err := t.Speak(ctx, "已完成"); err != nil {
+			log.Printf("[Voice] TTS failed: %v", err)
+		}
+	} else {
+		// Speak full response
+		if err := t.Speak(ctx, response); err != nil {
+			log.Printf("[Voice] TTS failed: %v", err)
+		}
 	}
 
 	return response, nil

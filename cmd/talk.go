@@ -20,6 +20,7 @@ var (
 	wakeWord        string
 	continuousMode  bool
 	defaultVoice    string
+	briefVoice      bool
 )
 
 var talkCmd = &cobra.Command{
@@ -48,6 +49,7 @@ func init() {
 	talkCmd.Flags().StringVar(&voiceAPIKey, "voice-api-key", "", "Voice API key (or VOICE_API_KEY env)")
 	talkCmd.Flags().StringVar(&wakeWord, "wake-word", "", "Wake word for activation (or WAKE_WORD env)")
 	talkCmd.Flags().BoolVar(&continuousMode, "continuous", false, "Keep listening after each response")
+	talkCmd.Flags().BoolVar(&briefVoice, "brief", true, "Brief voice mode: print full text, speak only notification")
 	talkCmd.Flags().StringVar(&defaultVoice, "voice", "", "Default voice name")
 	talkCmd.Flags().StringVar(&aiProvider, "provider", "", "AI provider: claude, deepseek, kimi (or AI_PROVIDER env)")
 	talkCmd.Flags().StringVar(&aiAPIKey, "api-key", "", "AI API Key (or AI_API_KEY env)")
@@ -141,6 +143,7 @@ func runTalk(cmd *cobra.Command, args []string) {
 		WakeWord:       wakeWord,
 		ContinuousMode: continuousMode,
 		DefaultVoice:   defaultVoice,
+		BriefVoice:     briefVoice,
 	}, messageHandler)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error creating talk mode: %v\n", err)
