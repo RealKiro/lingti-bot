@@ -31,7 +31,7 @@ const (
 // Config holds relay configuration
 type Config struct {
 	UserID     string // From /whoami
-	Platform   string // "feishu" or "slack"
+	Platform   string // "feishu", "slack", or "wechat"
 	ServerURL  string // WebSocket URL (default: wss://bot.lingti.com/ws)
 	WebhookURL string // Webhook URL (default: https://bot.lingti.com/webhook)
 	AIProvider string // AI provider name (e.g., "claude", "deepseek")
@@ -106,8 +106,8 @@ func New(cfg Config) (*Platform, error) {
 	if cfg.Platform == "" {
 		return nil, fmt.Errorf("platform is required")
 	}
-	if cfg.Platform != "feishu" && cfg.Platform != "slack" {
-		return nil, fmt.Errorf("platform must be 'feishu' or 'slack'")
+	if cfg.Platform != "feishu" && cfg.Platform != "slack" && cfg.Platform != "wechat" {
+		return nil, fmt.Errorf("platform must be 'feishu', 'slack', or 'wechat'")
 	}
 
 	if cfg.ServerURL == "" {

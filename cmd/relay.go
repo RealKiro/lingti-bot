@@ -31,11 +31,11 @@ var relayCmd = &cobra.Command{
 	Long: `Connect to the lingti-bot cloud relay service to process messages
 using your local AI API key.
 
-This allows you to use the official lingti-bot service on Feishu/Slack
+This allows you to use the official lingti-bot service on Feishu/Slack/WeChat
 without registering your own bot application.
 
 User Flow:
-  1. Follow the official lingti-bot on Feishu/Slack
+  1. Follow the official lingti-bot on Feishu/Slack/WeChat
   2. Send /whoami to get your user ID
   3. Run: lingti-bot relay --user-id <ID> --platform feishu
   4. Messages are processed locally with your AI API key
@@ -43,7 +43,7 @@ User Flow:
 
 Required:
   --user-id     Your user ID from /whoami
-  --platform    Platform type: feishu or slack
+  --platform    Platform type: feishu, slack, or wechat
   --api-key     AI API key (or AI_API_KEY env)
 
 Environment variables:
@@ -62,7 +62,7 @@ func init() {
 	rootCmd.AddCommand(relayCmd)
 
 	relayCmd.Flags().StringVar(&relayUserID, "user-id", "", "User ID from /whoami (required, or RELAY_USER_ID env)")
-	relayCmd.Flags().StringVar(&relayPlatform, "platform", "", "Platform: feishu or slack (required, or RELAY_PLATFORM env)")
+	relayCmd.Flags().StringVar(&relayPlatform, "platform", "", "Platform: feishu, slack, or wechat (required, or RELAY_PLATFORM env)")
 	relayCmd.Flags().StringVar(&relayServerURL, "server", "", "WebSocket URL (default: wss://bot.lingti.com/ws, or RELAY_SERVER_URL env)")
 	relayCmd.Flags().StringVar(&relayWebhookURL, "webhook", "", "Webhook URL (default: https://bot.lingti.com/webhook, or RELAY_WEBHOOK_URL env)")
 	relayCmd.Flags().StringVar(&relayAIProvider, "provider", "", "AI provider: claude or deepseek (or AI_PROVIDER env)")
@@ -114,11 +114,11 @@ func runRelay(cmd *cobra.Command, args []string) {
 		os.Exit(1)
 	}
 	if relayPlatform == "" {
-		fmt.Fprintln(os.Stderr, "Error: --platform is required (feishu or slack)")
+		fmt.Fprintln(os.Stderr, "Error: --platform is required (feishu, slack, or wechat)")
 		os.Exit(1)
 	}
-	if relayPlatform != "feishu" && relayPlatform != "slack" {
-		fmt.Fprintln(os.Stderr, "Error: --platform must be 'feishu' or 'slack'")
+	if relayPlatform != "feishu" && relayPlatform != "slack" && relayPlatform != "wechat" {
+		fmt.Fprintln(os.Stderr, "Error: --platform must be 'feishu', 'slack', or 'wechat'")
 		os.Exit(1)
 	}
 	if relayAPIKey == "" {
