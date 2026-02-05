@@ -93,3 +93,8 @@ gh release create "v$VERSION" \
 
 echo "==> Release v$VERSION complete!"
 echo "View at: https://github.com/ruilisi/lingti-bot/releases/tag/v$VERSION"
+echo ""
+echo "==> IMPORTANT: Post-release steps"
+echo "    1. Deploy Docker production to update install.sh"
+echo "    2. Update version in install.sh to $VERSION"
+echo "    3. Refresh/restart the production container"
