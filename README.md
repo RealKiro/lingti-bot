@@ -756,13 +756,36 @@ make build  # 或: make darwin-arm64 / make linux-amd64
 
 ## 为什么选择 lingti-bot？
 
-### 极简集成
+### lingti-bot vs OpenClaw
 
-与其他方案相比，lingti-bot 的集成极其简单：
+|  | **lingti-bot** | **OpenClaw** |
+|--|----------------|--------------|
+| **语言** | 纯 Go 实现 | Node.js |
+| **运行依赖** | 无（单一二进制） | 需要 Node.js 运行时 |
+| **分发方式** | 单个可执行文件，复制即用 | npm 安装，依赖 node_modules |
+| **嵌入式设备** | ✅ 可轻松部署到 ARM/MIPS 等小型设备 | ❌ 需要 Node.js 环境 |
+| **安装大小** | ~15MB 单文件 | 100MB+ (含 node_modules) |
+| **输出风格** | 纯文本，无彩色 | 彩色输出 |
+| **设计哲学** | 极简主义，够用就好 | 功能丰富，灵活优先 |
+| **中国平台** | 原生支持飞书/企微/钉钉 | 需自行集成 |
 
-- **vs OpenClaw** - 提供同样灵活的软件接入方式，同时支持一键接入
-- **vs 自建方案** - 无需从零开发，开箱即用
-- **vs SaaS 方案** - 完全本地运行，数据不上云
+**为什么选择纯 Go + 纯文本输出？**
+
+> *"Simplicity is the ultimate sophistication."* — Leonardo da Vinci
+
+lingti-bot 将**简洁性**作为最高设计原则：
+
+1. **零依赖部署** — 单一二进制，`scp` 到任何机器即可运行，无需安装 Node.js、Python 或其他运行时
+2. **嵌入式友好** — 可编译到 ARM、MIPS 等架构，轻松部署到树莓派、路由器、NAS 等小型设备
+3. **纯文本输出** — 不使用彩色终端输出，避免引入额外的渲染库或终端兼容性问题
+4. **代码克制** — 每一行代码都有明确的存在理由，拒绝过度设计
+
+```bash
+# 克隆即编译，编译即运行
+git clone https://github.com/ruilisi/lingti-bot.git
+cd lingti-bot && make
+./dist/lingti-bot router --provider deepseek --api-key sk-xxx
+```
 
 ### 单一二进制
 
@@ -783,6 +806,17 @@ make build
 ### 跨平台支持
 
 核心功能支持 macOS、Linux、Windows。macOS 用户可享受日历、提醒事项、备忘录、音乐控制等原生功能。
+
+**支持的目标平台：**
+
+| 平台 | 架构 | 编译命令 |
+|------|------|----------|
+| macOS | ARM64 (Apple Silicon) | `make darwin-arm64` |
+| macOS | AMD64 (Intel) | `make darwin-amd64` |
+| Linux | AMD64 | `make linux-amd64` |
+| Linux | ARM64 | `make linux-arm64` |
+| Linux | ARMv7 (树莓派等) | `make linux-arm` |
+| Windows | AMD64 | `make windows-amd64` |
 
 ---
 
