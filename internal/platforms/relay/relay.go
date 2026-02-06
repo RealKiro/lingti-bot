@@ -491,6 +491,12 @@ func (p *Platform) handleRawWeComMessage(data []byte) {
 		return
 	}
 
+	// Check if this message is for our agent (skip messages from other apps in same corp)
+	if encryptedMsg.AgentID != "" && p.config.WeComAgentID != "" && encryptedMsg.AgentID != p.config.WeComAgentID {
+		debug.Log("Ignoring message from different agent: %s (our agent: %s)", encryptedMsg.AgentID, p.config.WeComAgentID)
+		return
+	}
+
 	// Decrypt the message locally
 	plaintext, err := p.msgCrypt.DecryptMsg(rawMsg.MsgSignature, rawMsg.Timestamp, rawMsg.Nonce, &encryptedMsg)
 	if err != nil {
