@@ -491,16 +491,19 @@ func (p *Platform) handleRawWeComMessage(data []byte) {
 		return
 	}
 
+	log.Printf("[Relay] Raw WeCom: ToUserName=%s, AgentID=%s (our agent: %s)",
+		encryptedMsg.ToUserName, encryptedMsg.AgentID, p.config.WeComAgentID)
+
 	// Check if this message is for our agent (skip messages from other apps in same corp)
 	if encryptedMsg.AgentID != "" && p.config.WeComAgentID != "" && encryptedMsg.AgentID != p.config.WeComAgentID {
-		debug.Log("Ignoring message from different agent: %s (our agent: %s)", encryptedMsg.AgentID, p.config.WeComAgentID)
+		log.Printf("[Relay] Skipping message from different agent: %s", encryptedMsg.AgentID)
 		return
 	}
 
 	// Decrypt the message locally
 	plaintext, err := p.msgCrypt.DecryptMsg(rawMsg.MsgSignature, rawMsg.Timestamp, rawMsg.Nonce, &encryptedMsg)
 	if err != nil {
-		log.Printf("[Relay] Failed to decrypt WeCom message: %v", err)
+		log.Printf("[Relay] Failed to decrypt WeCom message (agent=%s): %v", encryptedMsg.AgentID, err)
 		return
 	}
 
