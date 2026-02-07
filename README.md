@@ -6,7 +6,18 @@
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Website](https://img.shields.io/badge/官网-cli.lingti.com-blue?style=flat)](https://cli.lingti.com/bot)
 
-**灵小缇** 是一个集 **MCP Server**、**多平台消息网关**、**丰富工具集**、**智能对话**、**语音交互**于一体的 AI Bot 平台。微信、飞书等平台秒接入，兼具 [OpenClaw](docs/openclaw-reference.md) 式灵活接入。查看 [开发路线图](docs/roadmap.md) 了解更多功能规划。
+**灵小缇** 是一个集 **MCP Server**、**多平台消息网关**、**丰富工具集**、**智能对话**、**语音交互**于一体的 AI Bot 平台。
+
+**核心优势：**
+- 🚀 **零依赖部署** — 单个 30MB 二进制文件，无需 Node.js/Python 运行时，`scp` 即用
+- ☁️ **云中继加持** — 无需公网服务器、域名备案、HTTPS 证书，5 分钟接入企业微信/微信公众号
+- 🤖 **浏览器自动化** — 内置 CDP 协议控制，快照-操作模式，无需 Puppeteer/Playwright 安装
+- 🛠️ **70+ MCP 工具** — 覆盖文件、Shell、系统、网络、日历、Git、GitHub 等全场景
+- 🌏 **中国平台原生支持** — 钉钉、飞书、企业微信、微信公众号开箱即用
+- 🔌 **嵌入式友好** — 可编译到 ARM/MIPS，轻松部署到树莓派、路由器、NAS
+- 🧠 **多 AI 后端** — 集成 Claude、DeepSeek、Kimi、MiniMax、Gemini 等，按需切换
+
+支持钉钉、飞书、企业微信、微信公众号、Slack、Telegram、Discord 等平台秒接入，兼具 [OpenClaw](docs/openclaw-reference.md) 式灵活接入。查看 [开发路线图](docs/roadmap.md) 了解更多功能规划。
 
 > **为什么叫"灵小缇"？** 灵缇犬（Greyhound）是世界上跑得最快的犬，以敏捷、忠诚著称。灵小缇同样敏捷高效，是你忠实的 AI 助手。
 
