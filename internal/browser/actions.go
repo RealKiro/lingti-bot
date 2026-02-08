@@ -2,6 +2,8 @@ package browser
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/go-rod/rod"
@@ -14,7 +16,7 @@ import (
 func Click(page *rod.Page, b *Browser, ref int) error {
 	el, err := resolveRef(page, b, ref)
 	if err != nil {
-		return err
+		return captureErrorScreenshot(page, b, "click_resolve", ref, err)
 	}
 
 	// Scroll into view so the element is visible
@@ -28,12 +30,12 @@ func Click(page *rod.Page, b *Browser, ref int) error {
 		// Try a short wait and retry once
 		time.Sleep(500 * time.Millisecond)
 		if _, err := el.Interactable(); err != nil {
-			return fmt.Errorf("element [%d] not interactable: %w", ref, err)
+			return captureErrorScreenshot(page, b, "click_not_interactable", ref, fmt.Errorf("element [%d] not interactable: %w", ref, err))
 		}
 	}
 
 	if err := el.Click(proto.InputMouseButtonLeft, 1); err != nil {
-		return fmt.Errorf("click failed: %w", err)
+		return captureErrorScreenshot(page, b, "click_failed", ref, fmt.Errorf("click failed: %w", err))
 	}
 
 	// Wait briefly for page to settle after click (animations, AJAX, etc.)
@@ -47,7 +49,7 @@ func Click(page *rod.Page, b *Browser, ref int) error {
 func Type(page *rod.Page, b *Browser, ref int, text string, submit bool) error {
 	el, err := resolveRef(page, b, ref)
 	if err != nil {
-		return err
+		return captureErrorScreenshot(page, b, "type_resolve", ref, err)
 	}
 
 	// Scroll into view
@@ -59,7 +61,7 @@ func Type(page *rod.Page, b *Browser, ref int, text string, submit bool) error {
 	if err := el.Click(proto.InputMouseButtonLeft, 1); err != nil {
 		// Try Focus as fallback
 		if err := el.Focus(); err != nil {
-			return fmt.Errorf("failed to focus element [%d]: %w", ref, err)
+			return captureErrorScreenshot(page, b, "type_focus", ref, fmt.Errorf("failed to focus element [%d]: %w", ref, err))
 		}
 	}
 
@@ -74,14 +76,14 @@ func Type(page *rod.Page, b *Browser, ref int, text string, submit bool) error {
 
 	// Input text
 	if err := el.Input(text); err != nil {
-		return fmt.Errorf("failed to type text: %w", err)
+		return captureErrorScreenshot(page, b, "type_input", ref, fmt.Errorf("failed to type text: %w", err))
 	}
 
 	if submit {
 		// Small delay before submit to let input handlers process
 		time.Sleep(100 * time.Millisecond)
 		if err := el.Type(input.Enter); err != nil {
-			return fmt.Errorf("failed to press Enter: %w", err)
+			return captureErrorScreenshot(page, b, "type_submit", ref, fmt.Errorf("failed to press Enter: %w", err))
 		}
 		// Wait for page to settle after submit (navigation/AJAX)
 		_ = page.WaitStable(500 * time.Millisecond)
@@ -193,4 +195,31 @@ var keyMap = map[string]input.Key{
 	"End":        input.End,
 	"PageUp":     input.PageUp,
 	"PageDown":   input.PageDown,
+}
+
+// captureErrorScreenshot captures a screenshot when an action fails (if debug mode is enabled).
+// It returns the original error with additional context about the screenshot location.
+func captureErrorScreenshot(page *rod.Page, b *Browser, action string, ref int, originalErr error) error {
+	if !b.IsDebugMode() {
+		return originalErr
+	}
+
+	timestamp := time.Now().Format("2006-01-02_15-04-05.000")
+	filename := fmt.Sprintf("error_%s_ref%d_%s.png", action, ref, timestamp)
+	screenshotPath := filepath.Join(b.DebugDir(), filename)
+
+	screenshot, err := page.Screenshot(false, &proto.PageCaptureScreenshot{
+		Format: proto.PageCaptureScreenshotFormatPng,
+	})
+	if err != nil {
+		// Failed to capture screenshot, just return original error
+		return originalErr
+	}
+
+	if err := os.WriteFile(screenshotPath, screenshot, 0644); err != nil {
+		// Failed to save screenshot, just return original error
+		return originalErr
+	}
+
+	return fmt.Errorf("%w (debug screenshot saved to: %s)", originalErr, screenshotPath)
 }

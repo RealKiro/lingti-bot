@@ -8,7 +8,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var logLevel string
+var (
+	logLevel string
+	debug    bool
+)
 
 var rootCmd = &cobra.Command{
 	Use:   "lingti-bot",
@@ -23,6 +26,11 @@ It provides tools for:
   - Process management
   - Network information`,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		// If --debug is set, override log level to very-verbose
+		if debug {
+			logLevel = "very-verbose"
+		}
+
 		// Parse and set log level
 		level, err := logger.ParseLevel(logLevel)
 		if err != nil {
@@ -36,6 +44,13 @@ It provides tools for:
 func init() {
 	rootCmd.PersistentFlags().StringVar(&logLevel, "log", "info",
 		"Log level: silent, info, verbose, very-verbose")
+	rootCmd.PersistentFlags().BoolVar(&debug, "debug", false,
+		"Enable debug mode (sets log level to very-verbose and enables browser debug)")
+}
+
+// IsDebug returns true if debug mode is enabled globally
+func IsDebug() bool {
+	return debug
 }
 
 func Execute() {

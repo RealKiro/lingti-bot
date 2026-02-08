@@ -24,6 +24,10 @@ type Browser struct {
 
 	// refs holds the latest snapshot ref map (ref number → RefEntry).
 	refs map[int]RefEntry
+
+	// Debug mode configuration
+	debugMode bool
+	debugDir  string
 }
 
 var (
@@ -312,4 +316,24 @@ func (b *Browser) Status() StatusInfo {
 		}
 	}
 	return info
+}
+
+// EnableDebug enables debug mode with the specified directory for screenshots.
+func (b *Browser) EnableDebug(debugDir string) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.debugMode = true
+	b.debugDir = debugDir
+}
+
+// IsDebugMode returns whether debug mode is enabled.
+// No lock needed - debugMode is set once at startup and never modified.
+func (b *Browser) IsDebugMode() bool {
+	return b.debugMode
+}
+
+// DebugDir returns the debug directory path.
+// No lock needed - debugDir is set once at startup and never modified.
+func (b *Browser) DebugDir() string {
+	return b.debugDir
 }

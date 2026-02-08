@@ -4,7 +4,7 @@
 
 # lingti-bot (灵小缇) 🐕⚡
 
-> 🐕⚡ **极简至上 效率为王 一次编译 到处执行 极速接入**的 AI Bot
+> 🐕⚡「**极简至上 效率为王 一次编译 到处执行 极速接入**」的 AI Bot
 
 [![Go Version](https://img.shields.io/badge/Go-1.23+-00ADD8?style=flat&logo=go)](https://go.dev/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
@@ -13,7 +13,7 @@
 **灵小缇** 是一个集 **MCP Server**、**多平台消息网关**、**丰富工具集**、**智能对话**、**语音交互**于一体的 AI Bot 平台。
 
 **核心优势：**
-- 🚀 **零依赖部署** — 单个 30MB 二进制文件，无需 Node.js/Python 运行时，`scp` 即用
+- 🚀 **零依赖部署** — 单个 30MB 二进制文件，无需 Node.js/Python 运行时，**一行命令**安装即用
 - ☁️ **云中继加持** — 无需公网服务器、域名备案、HTTPS 证书，5 分钟接入企业微信/微信公众号
 - 🤖 **浏览器自动化** — 内置 CDP 协议控制，快照-操作模式，无需 Puppeteer/Playwright 安装
 - 🛠️ **75+ MCP 工具** — 覆盖文件、Shell、系统、网络、日历、Git、GitHub 等全场景

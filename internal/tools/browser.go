@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/go-rod/rod/lib/proto"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/pltanton/lingti-bot/internal/browser"
-
 )
 
 // BrowserStart launches a browser instance or connects to an existing Chrome.
@@ -128,9 +128,26 @@ func BrowserSnapshot(_ context.Context, _ mcp.CallToolRequest) (*mcp.CallToolRes
 	info, _ := page.Info()
 	header := ""
 	if info != nil {
-		header = fmt.Sprintf("URL: %s\nTitle: %s\nRefs: %d\n\n", info.URL, info.Title, len(refs))
+		header = fmt.Sprintf("URL: %s\nTitle: %s\nRefs: %d\n", info.URL, info.Title, len(refs))
 	}
 
+	// Save debug screenshot if debug mode is enabled
+	if b.IsDebugMode() {
+		timestamp := time.Now().Format("2006-01-02_15-04-05.000")
+		filename := fmt.Sprintf("snapshot_%s.png", timestamp)
+		screenshotPath := filepath.Join(b.DebugDir(), filename)
+
+		screenshot, err := page.Screenshot(false, &proto.PageCaptureScreenshot{
+			Format: proto.PageCaptureScreenshotFormatPng,
+		})
+		if err == nil {
+			if err := os.WriteFile(screenshotPath, screenshot, 0644); err == nil {
+				header += fmt.Sprintf("Screenshot: %s\n", screenshotPath)
+			}
+		}
+	}
+
+	header += "\n"
 	return mcp.NewToolResultText(header + snapshot), nil
 }
 
@@ -209,7 +226,34 @@ func BrowserClick(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResu
 		return mcp.NewToolResultError(fmt.Sprintf("failed to get page: %v", err)), nil
 	}
 
+	// Try to click the element
 	if err := browser.Click(page, b, int(ref)); err != nil {
+		// Check if this is a "ref not found" error - might need fresh snapshot
+		errStr := err.Error()
+		if containsString(errStr, "ref") && containsString(errStr, "not found") {
+			// Try automatic retry with fresh snapshot
+			_, newRefs, snapErr := browser.Snapshot(page)
+			if snapErr == nil {
+				b.SetRefs(newRefs)
+
+				// Retry the click with updated refs
+				if retryErr := browser.Click(page, b, int(ref)); retryErr == nil {
+					entry, _ := b.GetRef(int(ref))
+					return mcp.NewToolResultText(fmt.Sprintf("Clicked [%d] %s %q (after auto-refresh)", int(ref), entry.Role, entry.Name)), nil
+				}
+			}
+		}
+
+		// If retry failed or not applicable, capture fresh snapshot for AI to see current state
+		snapshot, newRefs, snapErr := browser.Snapshot(page)
+		if snapErr == nil {
+			b.SetRefs(newRefs)
+			return mcp.NewToolResultError(fmt.Sprintf(
+				"Failed to click ref %d: %v\n\nCurrent page snapshot (refs may have changed):\n%s",
+				int(ref), err, snapshot,
+			)), nil
+		}
+
 		return mcp.NewToolResultError(fmt.Sprintf("failed to click ref %d: %v", int(ref), err)), nil
 	}
 
@@ -239,7 +283,37 @@ func BrowserType(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResul
 		return mcp.NewToolResultError(fmt.Sprintf("failed to get page: %v", err)), nil
 	}
 
+	// Try to type into the element
 	if err := browser.Type(page, b, int(ref), text, submit); err != nil {
+		// Check if this is a "ref not found" error - might need fresh snapshot
+		errStr := err.Error()
+		if containsString(errStr, "ref") && containsString(errStr, "not found") {
+			// Try automatic retry with fresh snapshot
+			_, newRefs, snapErr := browser.Snapshot(page)
+			if snapErr == nil {
+				b.SetRefs(newRefs)
+
+				// Retry the type with updated refs
+				if retryErr := browser.Type(page, b, int(ref), text, submit); retryErr == nil {
+					msg := fmt.Sprintf("Typed %q into [%d] (after auto-refresh)", text, int(ref))
+					if submit {
+						msg += " and pressed Enter"
+					}
+					return mcp.NewToolResultText(msg), nil
+				}
+			}
+		}
+
+		// If retry failed or not applicable, capture fresh snapshot for AI to see current state
+		snapshot, newRefs, snapErr := browser.Snapshot(page)
+		if snapErr == nil {
+			b.SetRefs(newRefs)
+			return mcp.NewToolResultError(fmt.Sprintf(
+				"Failed to type into ref %d: %v\n\nCurrent page snapshot (refs may have changed):\n%s",
+				int(ref), err, snapshot,
+			)), nil
+		}
+
 		return mcp.NewToolResultError(fmt.Sprintf("failed to type into ref %d: %v", int(ref), err)), nil
 	}
 
@@ -423,4 +497,9 @@ func BrowserTabClose(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolR
 		return mcp.NewToolResultError(fmt.Sprintf("failed to close tab: %v", err)), nil
 	}
 	return mcp.NewToolResultText("Closed active tab"), nil
+}
+
+// containsString is a helper to check if a string contains a substring (case-insensitive).
+func containsString(s, substr string) bool {
+	return strings.Contains(strings.ToLower(s), strings.ToLower(substr))
 }

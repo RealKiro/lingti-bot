@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 
 	"github.com/pltanton/lingti-bot/internal/agent"
+	"github.com/pltanton/lingti-bot/internal/browser"
 	"github.com/pltanton/lingti-bot/internal/logger"
 	"github.com/pltanton/lingti-bot/internal/platforms/dingtalk"
 	"github.com/pltanton/lingti-bot/internal/platforms/discord"
@@ -21,26 +23,27 @@ import (
 )
 
 var (
-	slackBotToken      string
-	slackAppToken      string
-	feishuAppID        string
-	feishuAppSecret    string
-	telegramToken      string
-	discordToken       string
-	wecomCorpID        string
-	wecomAgentID       string
-	wecomSecret        string
-	wecomToken         string
-	wecomAESKey        string
-	wecomPort          int
-	dingtalkClientID   string
+	slackBotToken        string
+	slackAppToken        string
+	feishuAppID          string
+	feishuAppSecret      string
+	telegramToken        string
+	discordToken         string
+	wecomCorpID          string
+	wecomAgentID         string
+	wecomSecret          string
+	wecomToken           string
+	wecomAESKey          string
+	wecomPort            int
+	dingtalkClientID     string
 	dingtalkClientSecret string
-	aiProvider         string
-	aiAPIKey           string
-	aiBaseURL          string
-	aiModel            string
-	voiceSTTProvider   string
-	voiceSTTAPIKey     string
+	aiProvider           string
+	aiAPIKey             string
+	aiBaseURL            string
+	aiModel              string
+	voiceSTTProvider     string
+	voiceSTTAPIKey       string
+	browserDebugDir      string
 )
 
 var routerCmd = &cobra.Command{
@@ -92,6 +95,7 @@ func init() {
 	routerCmd.Flags().StringVar(&aiModel, "model", "", "Model name (or AI_MODEL env)")
 	routerCmd.Flags().StringVar(&voiceSTTProvider, "voice-stt-provider", "", "Voice STT provider: system, openai (or VOICE_STT_PROVIDER env)")
 	routerCmd.Flags().StringVar(&voiceSTTAPIKey, "voice-stt-api-key", "", "Voice STT API key (or VOICE_STT_API_KEY env)")
+	routerCmd.Flags().StringVar(&browserDebugDir, "debug-dir", "", "Directory for debug screenshots (or BROWSER_DEBUG_DIR env, default: /tmp/lingti-bot on Unix)")
 }
 
 func runRouter(cmd *cobra.Command, args []string) {
@@ -172,6 +176,17 @@ func runRouter(cmd *cobra.Command, args []string) {
 		}
 	}
 
+	// Check if debug mode is enabled (global flag or env var)
+	debugEnabled := IsDebug()
+	if !debugEnabled {
+		if os.Getenv("BROWSER_DEBUG") == "1" || os.Getenv("BROWSER_DEBUG") == "true" {
+			debugEnabled = true
+		}
+	}
+	if browserDebugDir == "" {
+		browserDebugDir = os.Getenv("BROWSER_DEBUG_DIR")
+	}
+
 	// Validate required tokens
 	if aiAPIKey == "" {
 		fmt.Fprintln(os.Stderr, "Error: AI_API_KEY is required")
@@ -188,6 +203,16 @@ func runRouter(cmd *cobra.Command, args []string) {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error creating agent: %v\n", err)
 		os.Exit(1)
+	}
+
+	// Configure browser debug mode if enabled
+	if debugEnabled {
+		// Import is needed at the top: "github.com/pltanton/lingti-bot/internal/browser"
+		if err := setupBrowserDebug(browserDebugDir); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: Failed to setup browser debug: %v\n", err)
+		} else {
+			logger.Info("Browser debug mode enabled, screenshots will be saved to: %s", browserDebugDir)
+		}
 	}
 
 	// Create the router with the agent as message handler
@@ -335,4 +360,22 @@ func runRouter(cmd *cobra.Command, args []string) {
 
 	logger.Info("Shutting down...")
 	r.Stop()
+}
+
+func setupBrowserDebug(debugDir string) error {
+	// Use default debug directory if not specified
+	if debugDir == "" {
+		debugDir = filepath.Join(os.TempDir(), "lingti-bot")
+	}
+
+	// Create debug directory
+	if err := os.MkdirAll(debugDir, 0755); err != nil {
+		return fmt.Errorf("failed to create debug directory: %w", err)
+	}
+
+	// Configure browser instance
+	b := browser.Instance()
+	b.EnableDebug(debugDir)
+
+	return nil
 }
