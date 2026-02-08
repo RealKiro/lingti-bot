@@ -154,7 +154,7 @@ func (a *Agent) handleBuiltinCommand(msg router.Message) (router.Response, bool)
 			Text: `可用工具:
 
 📁 文件操作:
-  file_send, file_list, file_read, file_trash, file_list_old
+  file_send, file_list, file_read, file_write, file_trash, file_list_old
 
 📅 日历 (macOS):
   calendar_today, calendar_list_events, calendar_create_event
@@ -287,6 +287,7 @@ func (a *Agent) HandleMessage(ctx context.Context, msg router.Message) (router.R
 - file_send: Send/transfer a file to the user via messaging platform
 - file_list: List directory contents (use ~/Desktop for desktop)
 - file_read: Read file contents
+- file_write: Write content to a file (creates parent directories if needed)
 - file_trash: Move files to trash (for delete operations)
 - file_list_old: Find old files not modified for N days
 
@@ -460,6 +461,18 @@ func (a *Agent) buildToolsList() []Tool {
 				"type":       "object",
 				"properties": map[string]any{"path": map[string]string{"type": "string", "description": "Path to the file (use ~ for home, e.g., ~/Desktop/file.txt)"}},
 				"required":   []string{"path"},
+			}),
+		},
+		{
+			Name:        "file_write",
+			Description: "Write content to a file. Creates parent directories if needed. Use ~ for home directory.",
+			InputSchema: jsonSchema(map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"path":    map[string]string{"type": "string", "description": "Path to the file (use ~ for home, e.g., ~/Desktop/file.txt)"},
+					"content": map[string]string{"type": "string", "description": "Content to write to the file"},
+				},
+				"required": []string{"path", "content"},
 			}),
 		},
 		{
@@ -1093,6 +1106,16 @@ func callToolDirect(ctx context.Context, name string, args map[string]any) strin
 			path = p
 		}
 		return executeFileRead(ctx, path)
+	case "file_write":
+		path := ""
+		content := ""
+		if p, ok := args["path"].(string); ok {
+			path = p
+		}
+		if c, ok := args["content"].(string); ok {
+			content = c
+		}
+		return executeFileWrite(ctx, path, content)
 
 	// Calendar
 	case "calendar_today":

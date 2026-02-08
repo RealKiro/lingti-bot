@@ -161,6 +161,22 @@ func executeFileRead(ctx context.Context, path string) string {
 	return extractText(result)
 }
 
+// executeFileWrite writes content to a file
+func executeFileWrite(ctx context.Context, path string, content string) string {
+	req := mcp.CallToolRequest{}
+	req.Params.Arguments = map[string]interface{}{
+		"path":    path,
+		"content": content,
+	}
+
+	result, err := tools.FileWrite(ctx, req)
+	if err != nil {
+		return "Error: " + err.Error()
+	}
+
+	return extractText(result)
+}
+
 // executeShell runs the shell_execute tool
 func executeShell(ctx context.Context, command string) string {
 	logger.Verbose("[Shell] Executing: %s", command)
