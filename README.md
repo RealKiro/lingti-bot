@@ -2,7 +2,7 @@
 
 ---
 
-# lingti-bot (灵小缇) 🐕⚡
+# lingti-bot (灵小缇 [cli.lingti.com/bot](https://cli.lingti.com/bot))
 
 > 🐕⚡「**极简至上 效率为王 一次编译 到处执行 极速接入**」的 AI Bot
 

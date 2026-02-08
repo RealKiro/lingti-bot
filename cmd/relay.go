@@ -9,6 +9,7 @@ import (
 	"syscall"
 
 	"github.com/pltanton/lingti-bot/internal/agent"
+	"github.com/pltanton/lingti-bot/internal/config"
 	"github.com/pltanton/lingti-bot/internal/platforms/relay"
 	"github.com/pltanton/lingti-bot/internal/router"
 	"github.com/spf13/cobra"
@@ -161,6 +162,43 @@ func runRelay(cmd *cobra.Command, args []string) {
 	}
 	if relayWeComAESKey == "" {
 		relayWeComAESKey = os.Getenv("WECOM_AES_KEY")
+	}
+
+	// Fallback to saved config file
+	if savedCfg, err := config.Load(); err == nil {
+		if relayAIProvider == "" {
+			relayAIProvider = savedCfg.AI.Provider
+		}
+		if relayAPIKey == "" {
+			relayAPIKey = savedCfg.AI.APIKey
+		}
+		if relayBaseURL == "" {
+			relayBaseURL = savedCfg.AI.BaseURL
+		}
+		if relayModel == "" {
+			relayModel = savedCfg.AI.Model
+		}
+		if relayPlatform == "" && savedCfg.Mode == "relay" {
+			// Infer platform from saved config
+			if savedCfg.Platforms.WeCom.CorpID != "" {
+				relayPlatform = "wecom"
+			}
+		}
+		if relayWeComCorpID == "" {
+			relayWeComCorpID = savedCfg.Platforms.WeCom.CorpID
+		}
+		if relayWeComAgentID == "" {
+			relayWeComAgentID = savedCfg.Platforms.WeCom.AgentID
+		}
+		if relayWeComSecret == "" {
+			relayWeComSecret = savedCfg.Platforms.WeCom.Secret
+		}
+		if relayWeComToken == "" {
+			relayWeComToken = savedCfg.Platforms.WeCom.Token
+		}
+		if relayWeComAESKey == "" {
+			relayWeComAESKey = savedCfg.Platforms.WeCom.AESKey
+		}
 	}
 
 	// Validate required parameters

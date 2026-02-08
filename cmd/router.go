@@ -10,6 +10,7 @@ import (
 
 	"github.com/pltanton/lingti-bot/internal/agent"
 	"github.com/pltanton/lingti-bot/internal/browser"
+	"github.com/pltanton/lingti-bot/internal/config"
 	"github.com/pltanton/lingti-bot/internal/logger"
 	"github.com/pltanton/lingti-bot/internal/platforms/dingtalk"
 	"github.com/pltanton/lingti-bot/internal/platforms/discord"
@@ -173,6 +174,64 @@ func runRouter(cmd *cobra.Command, args []string) {
 		voiceSTTAPIKey = os.Getenv("VOICE_STT_API_KEY")
 		if voiceSTTAPIKey == "" && voiceSTTProvider == "openai" {
 			voiceSTTAPIKey = os.Getenv("OPENAI_API_KEY")
+		}
+	}
+
+	// Fallback to saved config file
+	if savedCfg, err := config.Load(); err == nil {
+		if aiProvider == "" {
+			aiProvider = savedCfg.AI.Provider
+		}
+		if aiAPIKey == "" {
+			aiAPIKey = savedCfg.AI.APIKey
+		}
+		if aiBaseURL == "" {
+			aiBaseURL = savedCfg.AI.BaseURL
+		}
+		if aiModel == "" {
+			aiModel = savedCfg.AI.Model
+		}
+		if slackBotToken == "" {
+			slackBotToken = savedCfg.Platforms.Slack.BotToken
+		}
+		if slackAppToken == "" {
+			slackAppToken = savedCfg.Platforms.Slack.AppToken
+		}
+		if feishuAppID == "" {
+			feishuAppID = savedCfg.Platforms.Feishu.AppID
+		}
+		if feishuAppSecret == "" {
+			feishuAppSecret = savedCfg.Platforms.Feishu.AppSecret
+		}
+		if telegramToken == "" {
+			telegramToken = savedCfg.Platforms.Telegram.Token
+		}
+		if discordToken == "" {
+			discordToken = savedCfg.Platforms.Discord.Token
+		}
+		if wecomCorpID == "" {
+			wecomCorpID = savedCfg.Platforms.WeCom.CorpID
+		}
+		if wecomAgentID == "" {
+			wecomAgentID = savedCfg.Platforms.WeCom.AgentID
+		}
+		if wecomSecret == "" {
+			wecomSecret = savedCfg.Platforms.WeCom.Secret
+		}
+		if wecomToken == "" {
+			wecomToken = savedCfg.Platforms.WeCom.Token
+		}
+		if wecomAESKey == "" {
+			wecomAESKey = savedCfg.Platforms.WeCom.AESKey
+		}
+		if wecomPort == 0 && savedCfg.Platforms.WeCom.CallbackPort != 0 {
+			wecomPort = savedCfg.Platforms.WeCom.CallbackPort
+		}
+		if dingtalkClientID == "" {
+			dingtalkClientID = savedCfg.Platforms.DingTalk.ClientID
+		}
+		if dingtalkClientSecret == "" {
+			dingtalkClientSecret = savedCfg.Platforms.DingTalk.ClientSecret
 		}
 	}
 

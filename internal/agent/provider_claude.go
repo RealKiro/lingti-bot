@@ -3,9 +3,27 @@ package agent
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"strings"
 
 	"github.com/liushuangls/go-anthropic/v2"
 )
+
+// oauthAdapter sends OAuth tokens as Authorization: Bearer instead of X-Api-Key.
+type oauthAdapter struct {
+	anthropic.DefaultAdapter
+	token string
+}
+
+func (a *oauthAdapter) SetRequestHeaders(_ *anthropic.Client, req *http.Request) error {
+	req.Header.Set("Authorization", "Bearer "+a.token)
+	req.Header.Set("Anthropic-Version", "2023-06-01")
+	return nil
+}
+
+func isOAuthToken(key string) bool {
+	return strings.HasPrefix(key, "sk-ant-oat")
+}
 
 // ClaudeProvider implements the Provider interface for Claude/Anthropic
 type ClaudeProvider struct {
@@ -30,12 +48,18 @@ func NewClaudeProvider(cfg ClaudeConfig) (*ClaudeProvider, error) {
 		cfg.Model = "claude-sonnet-4-20250514"
 	}
 
-	var client *anthropic.Client
+	opts := []anthropic.ClientOption{}
 	if cfg.BaseURL != "" {
-		client = anthropic.NewClient(cfg.APIKey, anthropic.WithBaseURL(cfg.BaseURL))
-	} else {
-		client = anthropic.NewClient(cfg.APIKey)
+		opts = append(opts, anthropic.WithBaseURL(cfg.BaseURL))
 	}
+	if isOAuthToken(cfg.APIKey) {
+		adapter := &oauthAdapter{token: cfg.APIKey}
+		opts = append(opts, func(c *anthropic.ClientConfig) {
+			c.Adapter = adapter
+		})
+	}
+
+	client := anthropic.NewClient(cfg.APIKey, opts...)
 
 	return &ClaudeProvider{
 		client: client,

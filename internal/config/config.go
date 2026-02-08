@@ -13,6 +13,57 @@ type Config struct {
 	Port      int             `yaml:"port"`
 	Security  SecurityConfig  `yaml:"security"`
 	Logging   LoggingConfig   `yaml:"logging"`
+	AI        AIConfig        `yaml:"ai,omitempty"`
+	Platforms PlatformConfig  `yaml:"platforms,omitempty"`
+	Mode      string          `yaml:"mode,omitempty"` // "relay" or "router"
+}
+
+type AIConfig struct {
+	Provider string `yaml:"provider,omitempty"`
+	APIKey   string `yaml:"api_key,omitempty"`
+	BaseURL  string `yaml:"base_url,omitempty"`
+	Model    string `yaml:"model,omitempty"`
+}
+
+type PlatformConfig struct {
+	WeCom    WeComConfig    `yaml:"wecom,omitempty"`
+	Slack    SlackConfig    `yaml:"slack,omitempty"`
+	Telegram TelegramConfig `yaml:"telegram,omitempty"`
+	Discord  DiscordConfig  `yaml:"discord,omitempty"`
+	Feishu   FeishuConfig   `yaml:"feishu,omitempty"`
+	DingTalk DingTalkConfig `yaml:"dingtalk,omitempty"`
+}
+
+type WeComConfig struct {
+	CorpID       string `yaml:"corp_id,omitempty"`
+	AgentID      string `yaml:"agent_id,omitempty"`
+	Secret       string `yaml:"secret,omitempty"`
+	Token        string `yaml:"token,omitempty"`
+	AESKey       string `yaml:"aes_key,omitempty"`
+	CallbackPort int    `yaml:"callback_port,omitempty"`
+}
+
+type SlackConfig struct {
+	BotToken string `yaml:"bot_token,omitempty"`
+	AppToken string `yaml:"app_token,omitempty"`
+}
+
+type TelegramConfig struct {
+	Token string `yaml:"token,omitempty"`
+}
+
+type DiscordConfig struct {
+	Token string `yaml:"token,omitempty"`
+}
+
+type FeishuConfig struct {
+	AppID     string `yaml:"app_id,omitempty"`
+	AppSecret string `yaml:"app_secret,omitempty"`
+}
+
+type DingTalkConfig struct {
+	ClientID     string `yaml:"client_id,omitempty"`
+	ClientSecret string `yaml:"client_secret,omitempty"`
 }
 
 type SecurityConfig struct {
@@ -89,5 +140,5 @@ func (c *Config) Save() error {
 		return err
 	}
 
-	return os.WriteFile(ConfigPath(), data, 0644)
+	return os.WriteFile(ConfigPath(), data, 0600)
 }
