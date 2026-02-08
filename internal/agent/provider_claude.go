@@ -2,14 +2,45 @@ package agent
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
+	"net/http/httputil"
+	"os"
 	"strings"
 
 	"github.com/liushuangls/go-anthropic/v2"
+	"github.com/pltanton/lingti-bot/internal/logger"
 )
 
-// oauthAdapter sends setup-tokens as Authorization: Bearer instead of X-Api-Key.
+// debugTransport logs outgoing request headers (with redacted auth) for debugging.
+type debugTransport struct {
+	base http.RoundTripper
+}
+
+func (d *debugTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if logger.IsDebug() {
+		dump, _ := httputil.DumpRequestOut(req, true)
+		log.Printf("[Claude OAuth DEBUG] Request:\n%s", string(dump[:min(len(dump), 500)]))
+		_ = os.WriteFile("/tmp/claude-request-dump.txt", dump, 0644)
+		log.Printf("[Claude OAuth DEBUG] Full request written to /tmp/claude-request-dump.txt")
+	}
+	return d.base.RoundTrip(req)
+}
+
+const (
+	anthropicSetupTokenPrefix    = "sk-ant-oat01-"
+	anthropicSetupTokenMinLength = 80
+	claudeCodeVersion            = "2.1.2"
+	claudeCodeSystemPrefix       = "You are Claude Code, Anthropic's official CLI for Claude."
+)
+
+func isOAuthToken(key string) bool {
+	return strings.HasPrefix(key, anthropicSetupTokenPrefix) && len(key) >= anthropicSetupTokenMinLength
+}
+
+// oauthAdapter mimics Claude Code's headers so OAuth setup tokens are accepted.
 type oauthAdapter struct {
 	anthropic.DefaultAdapter
 	token string
@@ -18,23 +49,20 @@ type oauthAdapter struct {
 func (a *oauthAdapter) SetRequestHeaders(_ *anthropic.Client, req *http.Request) error {
 	req.Header.Set("Authorization", "Bearer "+a.token)
 	req.Header.Set("Anthropic-Version", "2023-06-01")
-	req.Header.Set("Anthropic-Beta", "oauth-2025-04-20")
+	req.Header.Set("Anthropic-Beta", "claude-code-20250219,oauth-2025-04-20")
+	req.Header.Set("User-Agent", "claude-cli/"+claudeCodeVersion+" (external, cli)")
+	req.Header.Set("X-App", "cli")
+	req.Header.Set("Anthropic-Dangerous-Direct-Browser-Access", "true")
+	// Remove X-Api-Key if the default adapter set it before us
+	req.Header.Del("X-Api-Key")
 	return nil
-}
-
-const (
-	anthropicSetupTokenPrefix    = "sk-ant-oat01-"
-	anthropicSetupTokenMinLength = 80
-)
-
-func isOAuthToken(key string) bool {
-	return strings.HasPrefix(key, anthropicSetupTokenPrefix) && len(key) >= anthropicSetupTokenMinLength
 }
 
 // ClaudeProvider implements the Provider interface for Claude/Anthropic
 type ClaudeProvider struct {
-	client *anthropic.Client
-	model  string
+	client   *anthropic.Client
+	model    string
+	isOAuth  bool
 }
 
 // ClaudeConfig holds Claude provider configuration
@@ -54,22 +82,28 @@ func NewClaudeProvider(cfg ClaudeConfig) (*ClaudeProvider, error) {
 		cfg.Model = "claude-sonnet-4-20250514"
 	}
 
+	oauth := isOAuthToken(cfg.APIKey)
+
 	opts := []anthropic.ClientOption{}
 	if cfg.BaseURL != "" {
 		opts = append(opts, anthropic.WithBaseURL(cfg.BaseURL))
 	}
-	if isOAuthToken(cfg.APIKey) {
+	if oauth {
 		adapter := &oauthAdapter{token: cfg.APIKey}
 		opts = append(opts, func(c *anthropic.ClientConfig) {
 			c.Adapter = adapter
 		})
+		opts = append(opts, anthropic.WithHTTPClient(&http.Client{
+			Transport: &debugTransport{base: http.DefaultTransport},
+		}))
 	}
 
 	client := anthropic.NewClient(cfg.APIKey, opts...)
 
 	return &ClaudeProvider{
-		client: client,
-		model:  cfg.Model,
+		client:  client,
+		model:   cfg.Model,
+		isOAuth: oauth,
 	}, nil
 }
 
@@ -101,18 +135,42 @@ func (p *ClaudeProvider) Chat(ctx context.Context, req ChatRequest) (ChatRespons
 		maxTokens = 4096
 	}
 
-	// Call Anthropic API
-	resp, err := p.client.CreateMessages(ctx, anthropic.MessagesRequest{
+	// Build request
+	apiReq := anthropic.MessagesRequest{
 		Model:     anthropic.Model(p.model),
 		MaxTokens: maxTokens,
-		System:    req.SystemPrompt,
 		Messages:  messages,
 		Tools:     tools,
-	})
+	}
+
+	// For OAuth tokens, send system prompt as array with Claude Code identity as first block
+	if p.isOAuth {
+		parts := []anthropic.MessageSystemPart{
+			anthropic.NewSystemMessagePart(claudeCodeSystemPrefix),
+		}
+		if req.SystemPrompt != "" {
+			parts = append(parts, anthropic.NewSystemMessagePart(req.SystemPrompt))
+		}
+		apiReq.MultiSystem = parts
+	} else {
+		apiReq.System = req.SystemPrompt
+	}
+
+	// Call Anthropic API — OAuth tokens require streaming (Claude Code always streams)
+	if p.isOAuth {
+		resp, err := p.client.CreateMessagesStream(ctx, anthropic.MessagesStreamRequest{
+			MessagesRequest: apiReq,
+		})
+		if err != nil {
+			return ChatResponse{}, fmt.Errorf("anthropic API error: %w", err)
+		}
+		return p.fromAnthropicResponse(resp), nil
+	}
+
+	resp, err := p.client.CreateMessages(ctx, apiReq)
 	if err != nil {
 		return ChatResponse{}, fmt.Errorf("anthropic API error: %w", err)
 	}
-
 	return p.fromAnthropicResponse(resp), nil
 }
 
@@ -148,7 +206,11 @@ func (p *ClaudeProvider) toAnthropicMessage(msg Message) anthropic.Message {
 				content = append(content, anthropic.NewTextMessageContent(msg.Content))
 			}
 			for _, tc := range msg.ToolCalls {
-				content = append(content, anthropic.NewToolUseMessageContent(tc.ID, tc.Name, tc.Input))
+				input := tc.Input
+				if len(input) == 0 {
+					input = json.RawMessage(`{}`)
+				}
+				content = append(content, anthropic.NewToolUseMessageContent(tc.ID, tc.Name, input))
 			}
 			return anthropic.Message{
 				Role:    anthropic.RoleAssistant,
