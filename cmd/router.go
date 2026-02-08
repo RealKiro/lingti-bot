@@ -150,7 +150,10 @@ func runRouter(cmd *cobra.Command, args []string) {
 	}
 	if aiAPIKey == "" {
 		aiAPIKey = os.Getenv("AI_API_KEY")
-		// Fallback to legacy env var
+		// Fallback: ANTHROPIC_OAUTH_TOKEN (setup token) > ANTHROPIC_API_KEY
+		if aiAPIKey == "" {
+			aiAPIKey = os.Getenv("ANTHROPIC_OAUTH_TOKEN")
+		}
 		if aiAPIKey == "" {
 			aiAPIKey = os.Getenv("ANTHROPIC_API_KEY")
 		}

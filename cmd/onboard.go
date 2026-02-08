@@ -294,20 +294,20 @@ func stepAIProvider(cfg *config.Config) {
 	cfg.AI.Provider = p.name
 
 	if p.name == "claude" {
-		// Claude supports both API key and OAuth token
 		authIdx := promptSelect("Auth method:", []string{
-			"API Key  (from console.anthropic.com)",
-			"Token    (from Claude Code CLI / claude login)",
+			"API Key       (from console.anthropic.com)",
+			"Setup Token   (from 'claude setup-token', requires Claude subscription)",
 		}, 0)
 		if authIdx == 0 {
 			fmt.Printf("\n  Claude API Key (%s)\n", p.keyURL)
 			cfg.AI.APIKey = promptText("API Key", cfg.AI.APIKey)
 		} else {
-			fmt.Println("\n  If already logged in, extract your token with:")
-			fmt.Println("    security find-generic-password -s \"Claude Code-credentials\" -w \\")
-			fmt.Println("      | python3 -c \"import sys,json; print(json.loads(sys.stdin.read())['claudeAiOauth']['accessToken'])\"")
-			fmt.Println("  Or run 'claude login' first if not logged in yet.")
-			cfg.AI.APIKey = promptText("Token", cfg.AI.APIKey)
+			fmt.Println("\n  Run 'claude setup-token' in another terminal, then paste the token here.")
+			fmt.Println("  (Requires Claude Code CLI and an active Claude subscription)")
+			cfg.AI.APIKey = promptText("Setup Token (sk-ant-oat01-...)", cfg.AI.APIKey)
+			if cfg.AI.APIKey != "" && !strings.HasPrefix(cfg.AI.APIKey, "sk-ant-oat") {
+				fmt.Println("  Warning: expected token starting with sk-ant-oat01-")
+			}
 		}
 	} else {
 		displayName := strings.ToUpper(p.name[:1]) + p.name[1:]

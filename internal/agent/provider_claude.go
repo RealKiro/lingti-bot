@@ -9,7 +9,7 @@ import (
 	"github.com/liushuangls/go-anthropic/v2"
 )
 
-// oauthAdapter sends OAuth tokens as Authorization: Bearer instead of X-Api-Key.
+// oauthAdapter sends setup-tokens as Authorization: Bearer instead of X-Api-Key.
 type oauthAdapter struct {
 	anthropic.DefaultAdapter
 	token string
@@ -18,11 +18,17 @@ type oauthAdapter struct {
 func (a *oauthAdapter) SetRequestHeaders(_ *anthropic.Client, req *http.Request) error {
 	req.Header.Set("Authorization", "Bearer "+a.token)
 	req.Header.Set("Anthropic-Version", "2023-06-01")
+	req.Header.Set("Anthropic-Beta", "oauth-2025-04-20")
 	return nil
 }
 
+const (
+	anthropicSetupTokenPrefix    = "sk-ant-oat01-"
+	anthropicSetupTokenMinLength = 80
+)
+
 func isOAuthToken(key string) bool {
-	return strings.HasPrefix(key, "sk-ant-oat")
+	return strings.HasPrefix(key, anthropicSetupTokenPrefix) && len(key) >= anthropicSetupTokenMinLength
 }
 
 // ClaudeProvider implements the Provider interface for Claude/Anthropic

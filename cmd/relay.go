@@ -129,7 +129,10 @@ func runRelay(cmd *cobra.Command, args []string) {
 	}
 	if relayAPIKey == "" {
 		relayAPIKey = os.Getenv("AI_API_KEY")
-		// Fallback to legacy env var
+		// Fallback: ANTHROPIC_OAUTH_TOKEN (setup token) > ANTHROPIC_API_KEY
+		if relayAPIKey == "" {
+			relayAPIKey = os.Getenv("ANTHROPIC_OAUTH_TOKEN")
+		}
 		if relayAPIKey == "" {
 			relayAPIKey = os.Getenv("ANTHROPIC_API_KEY")
 		}
