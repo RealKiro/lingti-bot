@@ -1065,6 +1065,86 @@ make codesign       # 代码签名（需要开发者证书）
 
 ---
 
+## 命令行选项
+
+### 全局选项
+
+这些选项可用于所有命令，放在子命令之前使用。
+
+| 选项 | 简写 | 说明 | 默认值 |
+|------|------|------|--------|
+| `--yes` | `-y` | **自动批准模式** - 跳过所有确认提示，直接执行操作 | `false` |
+| `--debug` | - | **调试模式** - 启用详细日志和浏览器截图 | `false` |
+| `--log <level>` | - | **日志级别** - silent, info, verbose, very-verbose | `info` |
+| `--debug-dir <path>` | - | **调试目录** - 保存调试截图的路径 | `/tmp/lingti-bot` |
+
+#### 自动批准模式 (`--yes`)
+
+启用后，AI 将立即执行文件写入、删除、Shell 命令等操作，无需每次询问确认。
+
+**适用场景：**
+- ✅ 批量文件处理
+- ✅ 代码生成和重构
+- ✅ 文档自动更新
+- ✅ CI/CD 自动化流程
+- ✅ 信任环境下的快速操作
+
+**不适用场景：**
+- ❌ 生产环境服务器
+- ❌ 共享系统
+- ❌ 首次尝试新操作
+- ❌ 涉及敏感数据
+
+**使用示例：**
+
+```bash
+# 启用自动批准
+lingti-bot --yes router --provider deepseek --api-key sk-xxx
+
+# 简写形式
+lingti-bot -y router --provider deepseek --api-key sk-xxx
+
+# 结合调试模式
+lingti-bot --yes --debug router --provider deepseek --api-key sk-xxx
+```
+
+**行为对比：**
+
+```bash
+# 不使用 --yes（默认）
+用户：保存这个文件到 config.yaml
+AI：  我已经准备好内容。是否确认保存到 config.yaml？
+用户：是的
+AI：  ✅ 已保存到 config.yaml
+
+# 使用 --yes
+用户：保存这个文件到 config.yaml
+AI：  ✅ 已保存到 config.yaml (247 字节)
+```
+
+**安全提示：**
+- 在 git 仓库中使用 `--yes` 最安全，可随时通过 `git diff` 查看变更
+- 建议先在测试目录中尝试 `--yes` 模式
+- 即使启用 `--yes`，危险操作（如 `rm -rf /`）仍会被拒绝
+
+详细文档：
+- [自动批准完整指南](docs/auto-approval.md)
+- [快速参考](docs/auto-approval-quickref.md)
+
+#### 调试模式 (`--debug`)
+
+启用后自动设置日志级别为 `very-verbose`，并在浏览器操作出错时保存截图。
+
+```bash
+lingti-bot --debug router --provider deepseek --api-key sk-xxx
+```
+
+详细文档：
+- [浏览器调试指南](docs/browser-debug.md)
+- [快速参考](docs/browser-debug-quickref.md)
+
+---
+
 ## 环境变量
 
 | 变量 | 说明 | 必需 |

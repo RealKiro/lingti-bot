@@ -15,17 +15,19 @@ import (
 
 // Agent processes messages using AI providers and tools
 type Agent struct {
-	provider Provider
-	memory   *ConversationMemory
-	sessions *SessionStore
+	provider    Provider
+	memory      *ConversationMemory
+	sessions    *SessionStore
+	autoApprove bool
 }
 
 // Config holds agent configuration
 type Config struct {
-	Provider string // "claude" or "deepseek" (default: "claude")
-	APIKey   string
-	BaseURL  string // Custom API base URL (optional)
-	Model    string // Model name (optional, uses provider default)
+	Provider    string // "claude" or "deepseek" (default: "claude")
+	APIKey      string
+	BaseURL     string // Custom API base URL (optional)
+	Model       string // Model name (optional, uses provider default)
+	AutoApprove bool   // Skip all confirmation prompts (default: false)
 }
 
 // New creates a new Agent with the specified provider
@@ -40,9 +42,10 @@ func New(cfg Config) (*Agent, error) {
 	}
 
 	return &Agent{
-		provider: provider,
-		memory:   NewMemory(50, 60*time.Minute), // Keep 50 messages, 60 min TTL
-		sessions: NewSessionStore(),
+		provider:    provider,
+		memory:      NewMemory(50, 60*time.Minute), // Keep 50 messages, 60 min TTL
+		sessions:    NewSessionStore(),
+		autoApprove: cfg.AutoApprove,
 	}, nil
 }
 
@@ -251,8 +254,23 @@ func (a *Agent) HandleMessage(ctx context.Context, msg router.Message) (router.R
 	settings := a.sessions.Get(convKey)
 	thinkingPrompt := ThinkingPrompt(settings.ThinkingLevel)
 
+	// Auto-approval mode notice
+	autoApprovalNotice := ""
+	if a.autoApprove {
+		autoApprovalNotice = `
+
+## 🚀 AUTO-APPROVAL MODE ENABLED
+**You are running in auto-approval mode. DO NOT ask for permission before taking actions.**
+- Execute file writes, deletions, and modifications immediately without confirmation
+- Run shell commands directly without asking first
+- Create, modify, or delete files as requested without hesitation
+- The user has explicitly disabled all safety prompts with --yes flag
+- Only skip actions if they are IMPOSSIBLE or DANGEROUS (e.g., rm -rf /, destructive operations)
+- For normal operations (file writes, reads, modifications), proceed immediately`
+	}
+
 	// System prompt with actual paths
-	systemPrompt := fmt.Sprintf(`You are 灵缇 (Lingti), a helpful AI assistant running on the user's computer.
+	systemPrompt := fmt.Sprintf(`You are 灵缇 (Lingti), a helpful AI assistant running on the user's computer.%s
 
 ## System Environment
 - Operating System: %s
@@ -360,7 +378,7 @@ Then re-snapshot and continue.
 6. **NEVER claim success without tool execution** - If user asks to create/add/delete something, you MUST call the corresponding tool. Never say "已创建/已添加/已删除" unless you actually called the tool and it succeeded.
 7. **Date format for calendar** - When creating calendar events, use YYYY-MM-DD HH:MM format. Convert relative dates (明天/下周一) to absolute dates based on today's date.
 
-Current date: %s%s`, time.Now().Format("2006-01-02"), runtime.GOOS, runtime.GOARCH, homeDir, homeDir, homeDir, homeDir, msg.Username, thinkingPrompt)
+Current date: %s%s`, autoApprovalNotice, runtime.GOOS, runtime.GOARCH, homeDir, homeDir, homeDir, homeDir, msg.Username, time.Now().Format("2006-01-02"), thinkingPrompt)
 
 	// Call AI provider
 	resp, err := a.provider.Chat(ctx, ChatRequest{
