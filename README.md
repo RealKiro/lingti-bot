@@ -31,6 +31,24 @@
 curl -fsSL https://cli.lingti.com/install.sh | bash -s -- --bot
 ```
 
+安装完成后，通过交互式向导完成首次配置：
+
+```bash
+lingti-bot onboard
+```
+
+配置保存后，无需任何参数即可启动：
+
+```bash
+lingti-bot relay
+```
+
+也可以通过命令行参数直接启动，适合运行多个实例或覆盖已有配置：
+
+```bash
+lingti-bot relay --platform wecom --provider deepseek --api-key sk-xxx
+```
+
 ## 样例
 ### 智能对话、文件管理、信息检索
 <table>

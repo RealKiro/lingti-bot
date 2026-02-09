@@ -31,6 +31,24 @@ Supports DingTalk, Feishu, WeCom, WeChat Official Account, Slack, Telegram, Disc
 curl -fsSL https://cli.lingti.com/install.sh | bash -s -- --bot
 ```
 
+After installation, run the interactive setup wizard:
+
+```bash
+lingti-bot onboard
+```
+
+Once configured, start with no arguments needed:
+
+```bash
+lingti-bot relay
+```
+
+Or pass arguments directly to run multiple instances or override saved config:
+
+```bash
+lingti-bot relay --platform wecom --provider deepseek --api-key sk-xxx
+```
+
 ## Examples
 
 ### Intelligent Chat, File Management, Information Retrieval
