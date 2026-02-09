@@ -303,6 +303,25 @@ cron_delete(id="job-id-here")
 
 **特点：** 本地语音识别（whisper-cpp）、多语言支持、唤醒词激活、连续对话模式。
 
+### Skills — 模块化能力扩展
+
+Skills 是模块化的能力包，教会 lingti-bot 如何使用外部工具。每个 Skill 是一个包含 `SKILL.md` 文件的目录，通过 YAML frontmatter 声明依赖和元数据，通过 Markdown 正文提供 AI 指令。
+
+```bash
+# 列出所有已发现的 Skills
+lingti-bot skills
+
+# 查看就绪状态
+lingti-bot skills check
+
+# 查看某个 Skill 的详细信息
+lingti-bot skills info github
+```
+
+内置 8 个 Skills：Discord、GitHub、Slack、Peekaboo（macOS UI 自动化）、Tmux、天气、1Password、Obsidian。支持用户自定义和项目级 Skills。
+
+详细文档：[Skills 指南](docs/skills.md)
+
 ### 功能速览表
 
 | 模块 | 说明 | 特点 |
@@ -310,6 +329,7 @@ cron_delete(id="job-id-here")
 | **MCP Server** | 标准 MCP 协议服务器 | 兼容 Claude Desktop、Cursor、Windsurf 等所有 MCP 客户端 |
 | **多平台消息网关** | 消息平台集成 | 微信公众号、企业微信、Slack、飞书一键接入，支持云中继 |
 | **MCP 工具集** | 75+ 本地系统工具 | 文件、Shell、系统、网络、日历、Git、GitHub 等全覆盖 |
+| **Skills** | 模块化能力扩展 | 8 个内置 Skill，支持自定义和项目级扩展 |
 | **智能对话** | 多轮对话与记忆 | 上下文记忆、多 AI 后端（Claude/DeepSeek/Kimi/MiniMax） |
 | **语音交互** | 语音输入/输出 | 本地 whisper-cpp、OpenAI、ElevenLabs 多引擎支持 |
 
@@ -597,6 +617,7 @@ lingti-bot router \
 ### 详细文档
 
 - [命令行参考](docs/cli-reference.md) - 完整的命令行使用文档
+- [Skills 指南](docs/skills.md) - Skills 系统详解：创建、发现、配置
 - [Slack 集成指南](docs/slack-integration.md) - 完整的 Slack 应用配置教程
 - [飞书集成指南](docs/feishu-integration.md) - 飞书/Lark 应用配置教程
 - [企业微信集成指南](docs/wecom-integration.md) - 企业微信应用配置教程

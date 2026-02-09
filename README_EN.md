@@ -234,6 +234,25 @@ cron_create(
 
 Task configuration saved to `~/.lingti/crons.json`, auto-resume after MCP service restart.
 
+### Skills — Modular Capability Packs
+
+Skills are modular capability packs that teach lingti-bot how to use external tools. Each skill is a directory containing a `SKILL.md` file with YAML frontmatter for metadata and Markdown body for AI instructions.
+
+```bash
+# List all discovered skills
+lingti-bot skills
+
+# Check readiness status
+lingti-bot skills check
+
+# Get details on a specific skill
+lingti-bot skills info github
+```
+
+Ships with 8 bundled skills: Discord, GitHub, Slack, Peekaboo (macOS UI automation), Tmux, Weather, 1Password, and Obsidian. Supports user-custom and project-specific skills.
+
+See [Skills Guide](docs/skills.md) for full documentation.
+
 ### Multi-AI Backend
 
 Support multiple AI services, switch on demand:
@@ -266,6 +285,7 @@ Get Qwen API Key: Visit [Alibaba Cloud Bailian Platform](https://bailian.console
 ## Documentation
 
 - [CLI Reference](docs/cli-reference.md) - Complete CLI documentation
+- [Skills Guide](docs/skills.md) - Modular capability packs: create, discover, manage skills
 - [Slack Integration Guide](docs/slack-integration.md) - Complete Slack app configuration tutorial
 - [Feishu Integration Guide](docs/feishu-integration.md) - Feishu/Lark app configuration tutorial
 - [WeCom Integration Guide](docs/wecom-integration.md) - WeCom app configuration tutorial

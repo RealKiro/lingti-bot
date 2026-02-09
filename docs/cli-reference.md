@@ -11,6 +11,7 @@ Complete command line reference for lingti-bot.
   - [gateway](#gateway) - Start WebSocket gateway
   - [voice](#voice) - Voice input mode
   - [talk](#talk) - Continuous voice mode
+  - [skills](#skills) - Manage modular skills
   - [setup](#setup) - Setup dependencies
   - [version](#version) - Show version
 - [Environment Variables](#environment-variables)
