@@ -11,8 +11,12 @@ type Job struct {
 	ID        string         `json:"id"`                  // Unique identifier
 	Name      string         `json:"name"`                // Human-readable name
 	Schedule  string         `json:"schedule"`            // Cron expression
-	Tool      string         `json:"tool"`                // MCP tool to execute
+	Tool      string         `json:"tool,omitempty"`      // MCP tool to execute
 	Arguments map[string]any `json:"arguments,omitempty"` // Tool arguments
+	Message   string         `json:"message,omitempty"`   // Direct message to send (no tool execution)
+	Platform  string         `json:"platform,omitempty"`  // Target platform ("slack", "wecom", etc.)
+	ChannelID string         `json:"channel_id,omitempty"` // Target channel/user to send to
+	UserID    string         `json:"user_id,omitempty"`   // User who created the job
 	Enabled   bool                   `json:"enabled"`             // Whether job is active
 	CreatedAt time.Time              `json:"created_at"`          // Job creation timestamp
 	LastRun   *time.Time             `json:"last_run,omitempty"`  // Last execution timestamp
@@ -29,6 +33,10 @@ func (j *Job) Clone() *Job {
 		Name:      j.Name,
 		Schedule:  j.Schedule,
 		Tool:      j.Tool,
+		Message:   j.Message,
+		Platform:  j.Platform,
+		ChannelID: j.ChannelID,
+		UserID:    j.UserID,
 		Enabled:   j.Enabled,
 		CreatedAt: j.CreatedAt,
 		LastError: j.LastError,

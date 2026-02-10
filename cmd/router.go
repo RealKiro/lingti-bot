@@ -11,6 +11,7 @@ import (
 	"github.com/pltanton/lingti-bot/internal/agent"
 	"github.com/pltanton/lingti-bot/internal/browser"
 	"github.com/pltanton/lingti-bot/internal/config"
+	cronpkg "github.com/pltanton/lingti-bot/internal/cron"
 	"github.com/pltanton/lingti-bot/internal/logger"
 	"github.com/pltanton/lingti-bot/internal/platforms/dingtalk"
 	"github.com/pltanton/lingti-bot/internal/platforms/discord"
@@ -549,6 +550,20 @@ func runRouter(cmd *cobra.Command, args []string) {
 	// Create the router with the agent as message handler
 	r := router.New(aiAgent.HandleMessage)
 
+	// Initialize cron scheduler
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		homeDir = os.TempDir()
+	}
+	cronPath := filepath.Join(homeDir, ".lingti", "crons.json")
+	cronStore := cronpkg.NewStore(cronPath)
+	cronNotifier := agent.NewRouterCronNotifier(r)
+	cronScheduler := cronpkg.NewScheduler(cronStore, aiAgent, cronNotifier)
+	aiAgent.SetCronScheduler(cronScheduler)
+	if err := cronScheduler.Start(); err != nil {
+		logger.Warn("Failed to start cron scheduler: %v", err)
+	}
+
 	// Register Slack if tokens are provided
 	if slackBotToken != "" && slackAppToken != "" {
 		slackPlatform, err := slack.New(slack.Config{
@@ -878,6 +893,7 @@ func runRouter(cmd *cobra.Command, args []string) {
 	<-sigCh
 
 	logger.Info("Shutting down...")
+	cronScheduler.Stop()
 	r.Stop()
 }
 

@@ -9,16 +9,19 @@ import (
 	"strings"
 	"time"
 
+	cronpkg "github.com/pltanton/lingti-bot/internal/cron"
 	"github.com/pltanton/lingti-bot/internal/logger"
 	"github.com/pltanton/lingti-bot/internal/router"
 )
 
 // Agent processes messages using AI providers and tools
 type Agent struct {
-	provider    Provider
-	memory      *ConversationMemory
-	sessions    *SessionStore
-	autoApprove bool
+	provider      Provider
+	memory        *ConversationMemory
+	sessions      *SessionStore
+	autoApprove   bool
+	cronScheduler *cronpkg.Scheduler
+	currentMsg    router.Message // set during HandleMessage for cron_create context
 }
 
 // Config holds agent configuration
@@ -237,7 +240,10 @@ func (a *Agent) handleBuiltinCommand(msg router.Message) (router.Response, bool)
   music_now_playing, music_volume, music_search
 
 💻 系统:
-  system_info, shell_execute, process_list`,
+  system_info, shell_execute, process_list
+
+⏰ 定时任务:
+  cron_create, cron_list, cron_delete, cron_pause, cron_resume`,
 		}, true
 
 	case "/verbose on", "详细模式开":
@@ -268,8 +274,20 @@ func (a *Agent) handleBuiltinCommand(msg router.Message) (router.Response, bool)
 	return router.Response{}, false
 }
 
+// SetCronScheduler sets the cron scheduler for the agent
+func (a *Agent) SetCronScheduler(s *cronpkg.Scheduler) {
+	a.cronScheduler = s
+}
+
+// ExecuteTool implements the cron.ToolExecutor interface
+func (a *Agent) ExecuteTool(ctx context.Context, toolName string, arguments map[string]any) (any, error) {
+	result := callToolDirect(ctx, toolName, arguments)
+	return result, nil
+}
+
 // HandleMessage processes a message and returns a response
 func (a *Agent) HandleMessage(ctx context.Context, msg router.Message) (router.Response, error) {
+	a.currentMsg = msg
 	logger.Info("[Agent] Processing message from %s: %s (provider: %s)", msg.Username, msg.Text, a.provider.Name())
 
 	// Handle built-in commands
@@ -386,6 +404,13 @@ func (a *Agent) HandleMessage(ctx context.Context, msg router.Message) (router.R
 - music_now_playing: Current track info
 - music_volume: Set volume
 - music_search: Search and play
+
+### Scheduled Tasks (Cron)
+- cron_create: Create a scheduled task (send message or run tool periodically). Use standard cron expressions (minute hour day month weekday). For message tasks, set message parameter. For tool tasks, set tool and arguments parameters.
+- cron_list: List all scheduled tasks with their status
+- cron_delete: Delete a scheduled task by ID
+- cron_pause: Pause a scheduled task
+- cron_resume: Resume a paused scheduled task
 
 ### Browser Automation (snapshot-then-act pattern)
 - browser_start: Start new browser or connect to existing Chrome via cdp_url (e.g. "127.0.0.1:9222")
@@ -1073,6 +1098,55 @@ func (a *Agent) buildToolsList() []Tool {
 			Description: "Close the browser",
 			InputSchema: jsonSchema(map[string]any{"type": "object", "properties": map[string]any{}}),
 		},
+
+		// === SCHEDULED TASKS (CRON) ===
+		{
+			Name:        "cron_create",
+			Description: "Create a scheduled task. Use 'message' for periodic messages to the user, or 'tool'+'arguments' for periodic tool execution. Schedule uses standard 5-field cron: minute hour day month weekday.",
+			InputSchema: jsonSchema(map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"name":      map[string]string{"type": "string", "description": "Human-readable task name"},
+					"schedule":  map[string]string{"type": "string", "description": "Cron expression (e.g., '*/5 * * * *' for every 5 minutes, '0 9 * * 1-5' for weekdays at 9am)"},
+					"message":   map[string]string{"type": "string", "description": "Message to send to the user periodically (for message-based tasks)"},
+					"tool":      map[string]string{"type": "string", "description": "MCP tool to execute periodically (for tool-based tasks)"},
+					"arguments": map[string]string{"type": "object", "description": "Arguments for the tool (when using tool parameter)"},
+				},
+				"required": []string{"name", "schedule"},
+			}),
+		},
+		{
+			Name:        "cron_list",
+			Description: "List all scheduled tasks with their status, schedule, and last run time",
+			InputSchema: jsonSchema(map[string]any{"type": "object", "properties": map[string]any{}}),
+		},
+		{
+			Name:        "cron_delete",
+			Description: "Delete a scheduled task by its ID",
+			InputSchema: jsonSchema(map[string]any{
+				"type":       "object",
+				"properties": map[string]any{"id": map[string]string{"type": "string", "description": "Task ID to delete"}},
+				"required":   []string{"id"},
+			}),
+		},
+		{
+			Name:        "cron_pause",
+			Description: "Pause a scheduled task (it will stop running until resumed)",
+			InputSchema: jsonSchema(map[string]any{
+				"type":       "object",
+				"properties": map[string]any{"id": map[string]string{"type": "string", "description": "Task ID to pause"}},
+				"required":   []string{"id"},
+			}),
+		},
+		{
+			Name:        "cron_resume",
+			Description: "Resume a paused scheduled task",
+			InputSchema: jsonSchema(map[string]any{
+				"type":       "object",
+				"properties": map[string]any{"id": map[string]string{"type": "string", "description": "Task ID to resume"}},
+				"required":   []string{"id"},
+			}),
+		},
 	}
 }
 
@@ -1114,6 +1188,20 @@ func (a *Agent) executeTool(ctx context.Context, name string, input json.RawMess
 	var args map[string]any
 	if err := json.Unmarshal(input, &args); err != nil {
 		return fmt.Sprintf("Error parsing arguments: %v", err)
+	}
+
+	// Handle cron tools that need Agent context
+	switch name {
+	case "cron_create":
+		return a.executeCronCreate(args)
+	case "cron_list":
+		return a.executeCronList()
+	case "cron_delete":
+		return a.executeCronDelete(args)
+	case "cron_pause":
+		return a.executeCronPause(args)
+	case "cron_resume":
+		return a.executeCronResume(args)
 	}
 
 	// Call tools directly

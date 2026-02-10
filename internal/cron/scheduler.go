@@ -20,6 +20,7 @@ type ToolExecutor interface {
 // ChatNotifier interface for sending messages to chat
 type ChatNotifier interface {
 	NotifyChat(message string) error
+	NotifyChatUser(platform, channelID, userID, message string) error
 }
 
 // Scheduler manages scheduled jobs
@@ -90,23 +91,38 @@ func (s *Scheduler) Stop() error {
 	return nil
 }
 
-// AddJob adds a new job to the scheduler
+// AddJob adds a new tool-based job to the scheduler
 func (s *Scheduler) AddJob(name, schedule, tool string, arguments map[string]any) (*Job, error) {
-	// Validate cron expression
-	if _, err := cron.ParseStandard(schedule); err != nil {
-		return nil, fmt.Errorf("invalid cron expression: %w", err)
-	}
-
-	// Create new job
-	job := &Job{
-		ID:        uuid.New().String(),
+	return s.addJob(&Job{
 		Name:      name,
 		Schedule:  schedule,
 		Tool:      tool,
 		Arguments: arguments,
-		Enabled:   true,
-		CreatedAt: time.Now(),
+	})
+}
+
+// AddJobWithMessage adds a new message-based job that sends text to a chat user
+func (s *Scheduler) AddJobWithMessage(name, schedule, message, platform, channelID, userID string) (*Job, error) {
+	return s.addJob(&Job{
+		Name:      name,
+		Schedule:  schedule,
+		Message:   message,
+		Platform:  platform,
+		ChannelID: channelID,
+		UserID:    userID,
+	})
+}
+
+// addJob validates and schedules a job
+func (s *Scheduler) addJob(job *Job) (*Job, error) {
+	// Validate cron expression
+	if _, err := cron.ParseStandard(job.Schedule); err != nil {
+		return nil, fmt.Errorf("invalid cron expression: %w", err)
 	}
+
+	job.ID = uuid.New().String()
+	job.Enabled = true
+	job.CreatedAt = time.Now()
 
 	// Add to jobs map
 	s.mu.Lock()
@@ -252,9 +268,43 @@ func (s *Scheduler) scheduleJob(job *Job) error {
 // executeJob executes a job
 func (s *Scheduler) executeJob(job *Job) {
 	now := time.Now()
+
+	// Message-based job: send message directly to user
+	if job.Message != "" {
+		log.Printf("[CRON] Sending message for job: %s (%s)", job.ID, job.Name)
+
+		s.mu.Lock()
+		job.LastRun = &now
+		s.mu.Unlock()
+
+		if s.chatNotifier != nil && job.Platform != "" && job.ChannelID != "" {
+			if err := s.chatNotifier.NotifyChatUser(job.Platform, job.ChannelID, job.UserID, job.Message); err != nil {
+				s.mu.Lock()
+				job.LastError = err.Error()
+				s.mu.Unlock()
+				log.Printf("[CRON] Job failed to send message: %s (%s) - error: %v", job.ID, job.Name, err)
+			} else {
+				s.mu.Lock()
+				job.LastError = ""
+				s.mu.Unlock()
+				log.Printf("[CRON] Job message sent: %s (%s)", job.ID, job.Name)
+			}
+		} else {
+			log.Printf("[CRON] Job %s has no chat target, logging message: %s", job.ID, job.Message)
+			if s.chatNotifier != nil {
+				s.chatNotifier.NotifyChat(fmt.Sprintf("[%s] %s", job.Name, job.Message))
+			}
+		}
+
+		if err := s.saveJobs(); err != nil {
+			log.Printf("[CRON] Failed to save jobs: %v", err)
+		}
+		return
+	}
+
+	// Tool-based job: execute MCP tool
 	log.Printf("[CRON] Executing job: %s (%s) - tool: %s", job.ID, job.Name, job.Tool)
 
-	// Execute the tool
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
@@ -267,21 +317,20 @@ func (s *Scheduler) executeJob(job *Job) {
 		job.LastError = err.Error()
 		s.mu.Unlock()
 
-		// Log error to terminal
 		log.Printf("[CRON] Job failed: %s (%s) - error: %v", job.ID, job.Name, err)
 
-		// Send error to chat
 		if s.chatNotifier != nil {
 			errMsg := fmt.Sprintf("⚠️ Scheduled job '%s' failed: %v", job.Name, err)
-			if notifyErr := s.chatNotifier.NotifyChat(errMsg); notifyErr != nil {
-				log.Printf("[CRON] Failed to send error notification: %v", notifyErr)
+			if job.Platform != "" && job.ChannelID != "" {
+				s.chatNotifier.NotifyChatUser(job.Platform, job.ChannelID, job.UserID, errMsg)
+			} else {
+				s.chatNotifier.NotifyChat(errMsg)
 			}
 		}
 	} else {
 		job.LastError = ""
 		s.mu.Unlock()
 
-		// Log success
 		resultStr := ""
 		if result != nil {
 			if resultJSON, err := json.Marshal(result); err == nil {
@@ -291,7 +340,6 @@ func (s *Scheduler) executeJob(job *Job) {
 		log.Printf("[CRON] Job completed: %s (%s)%s", job.ID, job.Name, resultStr)
 	}
 
-	// Save updated job status
 	if err := s.saveJobs(); err != nil {
 		log.Printf("[CRON] Failed to save jobs: %v", err)
 	}

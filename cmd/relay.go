@@ -6,10 +6,12 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 
 	"github.com/pltanton/lingti-bot/internal/agent"
 	"github.com/pltanton/lingti-bot/internal/config"
+	cronpkg "github.com/pltanton/lingti-bot/internal/cron"
 	"github.com/pltanton/lingti-bot/internal/platforms/relay"
 	"github.com/pltanton/lingti-bot/internal/router"
 	"github.com/spf13/cobra"
@@ -293,6 +295,20 @@ func runRelay(cmd *cobra.Command, args []string) {
 	// Create the router with the agent as message handler
 	r := router.New(aiAgent.HandleMessage)
 
+	// Initialize cron scheduler
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		homeDir = os.TempDir()
+	}
+	cronPath := filepath.Join(homeDir, ".lingti", "crons.json")
+	cronStore := cronpkg.NewStore(cronPath)
+	cronNotifier := agent.NewRouterCronNotifier(r)
+	cronScheduler := cronpkg.NewScheduler(cronStore, aiAgent, cronNotifier)
+	aiAgent.SetCronScheduler(cronScheduler)
+	if err := cronScheduler.Start(); err != nil {
+		log.Printf("Warning: Failed to start cron scheduler: %v", err)
+	}
+
 	// Create and register relay platform
 	relayPlatformInstance, err := relay.New(relay.Config{
 		UserID:       relayUserID,
@@ -332,5 +348,6 @@ func runRelay(cmd *cobra.Command, args []string) {
 	<-sigCh
 
 	log.Println("Shutting down...")
+	cronScheduler.Stop()
 	r.Stop()
 }

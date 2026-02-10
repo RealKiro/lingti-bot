@@ -156,6 +156,17 @@ func (r *Router) Stop() error {
 	return nil
 }
 
+// SendToUser sends a proactive message to a user on a specific platform
+func (r *Router) SendToUser(platformName, channelID string, resp Response) error {
+	r.mu.RLock()
+	platform, ok := r.platforms[platformName]
+	r.mu.RUnlock()
+	if !ok {
+		return fmt.Errorf("platform %s not registered", platformName)
+	}
+	return platform.Send(context.Background(), channelID, resp)
+}
+
 // Wait blocks until the router is stopped
 func (r *Router) Wait() {
 	if r.ctx != nil {

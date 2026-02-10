@@ -122,6 +122,13 @@ func (s *Server) NotifyChat(message string) error {
 	return nil
 }
 
+// NotifyChatUser implements the ChatNotifier interface for the cron scheduler
+func (s *Server) NotifyChatUser(platform, channelID, userID, message string) error {
+	// In MCP mode, there's no router to send messages through, so just log
+	log.Printf("[CRON] Notification to %s/%s: %s", platform, channelID, message)
+	return nil
+}
+
 // addTool is a helper to add a tool and track its handler
 func (s *Server) addTool(tool mcp.Tool, handler ToolHandler) {
 	s.mcpServer.AddTool(tool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {

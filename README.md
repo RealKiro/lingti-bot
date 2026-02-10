@@ -69,6 +69,16 @@ lingti-bot relay --platform wecom --provider deepseek --api-key sk-xxx
 <img src="docs/images/demo-terminal.png" alt="Terminal Demo" />
 <p><sub>克隆代码后直接编译运行，配合 DeepSeek 模型，实时处理钉钉消息</sub></p>
 
+### 定时任务 — AI 自动创建 Cron Job
+
+> 用自然语言创建定时任务 — 告诉 AI 你想要什么，剩下的交给它
+
+<p align="center">
+<img src="docs/images/demo-cron-wecom.png" alt="AI 创建定时任务演示" width="720" />
+</p>
+
+在企业微信中对 AI 说一句话，即可创建复杂的定时任务。支持 Cron 表达式调度、macOS 系统通知、Shell 脚本执行等，真正实现无人值守自动化。
+
 ### 企业微信 AI 文件助手
 
 > 用自然语言管理和传输文件 — 就像跟同事说话一样简单
