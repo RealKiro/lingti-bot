@@ -423,7 +423,12 @@ func (a *Agent) HandleMessage(ctx context.Context, msg router.Message) (router.R
 - music_search: Search and play
 
 ### Scheduled Tasks (Cron)
-- cron_create: Create a scheduled task. Use standard cron expressions (minute hour day month weekday). For AI tasks (search web, summarize, etc.), set prompt parameter. For static message tasks, set message parameter. For single tool tasks, set tool and arguments parameters.
+- cron_create: Create ONE scheduled task. Use standard cron expressions (minute hour day month weekday).
+  IMPORTANT: Always create exactly ONE cron job per user request. Choose the right type:
+  - 'prompt': For dynamic/random/varied content (e.g., motivational quotes, news summaries, daily briefings). The AI runs a full conversation each time, so content is different every execution. This is the PREFERRED choice for most requests.
+  - 'message': For sending the exact same static text every time.
+  - 'tool'+'arguments': For executing a single specific MCP tool periodically.
+  NEVER create multiple cron jobs for one request. NEVER use shell_execute or file_write to implement cron - always use cron_create.
 - cron_list: List all scheduled tasks with their status
 - cron_delete: Delete a scheduled task by ID
 - cron_pause: Pause a scheduled task
@@ -1119,7 +1124,7 @@ func (a *Agent) buildToolsList() []Tool {
 		// === SCHEDULED TASKS (CRON) ===
 		{
 			Name:        "cron_create",
-			Description: "Create a scheduled task. Use 'prompt' to run a full AI conversation with tools (e.g., search web, fetch content, summarize) on schedule. Use 'message' for periodic static messages. Use 'tool'+'arguments' for periodic single tool execution. Schedule uses standard 5-field cron: minute hour day month weekday.",
+			Description: "Create exactly ONE scheduled task per user request. Use 'prompt' for dynamic/varied content (motivational quotes, news, briefings - AI generates fresh content each time). Use 'message' only for identical static text every time. Use 'tool'+'arguments' for a single MCP tool. NEVER create multiple jobs for one request. Schedule uses standard 5-field cron: minute hour day month weekday.",
 			InputSchema: jsonSchema(map[string]any{
 				"type": "object",
 				"properties": map[string]any{
