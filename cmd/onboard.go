@@ -60,6 +60,10 @@ var (
 	// Google Chat
 	onboardGoogleChatProjectID       string
 	onboardGoogleChatCredentialsFile string
+	// Mattermost
+	onboardMattermostServerURL string
+	onboardMattermostToken     string
+	onboardMattermostTeamName  string
 )
 
 var onboardCmd = &cobra.Command{
@@ -129,6 +133,10 @@ func init() {
 	// Google Chat
 	onboardCmd.Flags().StringVar(&onboardGoogleChatProjectID, "googlechat-project-id", "", "Google Chat Project ID")
 	onboardCmd.Flags().StringVar(&onboardGoogleChatCredentialsFile, "googlechat-credentials-file", "", "Google Chat Credentials File")
+	// Mattermost
+	onboardCmd.Flags().StringVar(&onboardMattermostServerURL, "mattermost-server-url", "", "Mattermost Server URL")
+	onboardCmd.Flags().StringVar(&onboardMattermostToken, "mattermost-token", "", "Mattermost Token")
+	onboardCmd.Flags().StringVar(&onboardMattermostTeamName, "mattermost-team-name", "", "Mattermost Team Name")
 }
 
 var scanner *bufio.Scanner
@@ -322,6 +330,16 @@ func applyOnboardFlags(cfg *config.Config) {
 		}
 		if onboardGoogleChatCredentialsFile != "" {
 			cfg.Platforms.GoogleChat.CredentialsFile = onboardGoogleChatCredentialsFile
+		}
+	case "mattermost":
+		if onboardMattermostServerURL != "" {
+			cfg.Platforms.Mattermost.ServerURL = onboardMattermostServerURL
+		}
+		if onboardMattermostToken != "" {
+			cfg.Platforms.Mattermost.Token = onboardMattermostToken
+		}
+		if onboardMattermostTeamName != "" {
+			cfg.Platforms.Mattermost.TeamName = onboardMattermostTeamName
 		}
 	}
 }
@@ -522,6 +540,7 @@ var platformOptions = []platformInfo{
 	{"teams", "teams     (Microsoft Teams)"},
 	{"matrix", "matrix    (Matrix/Element)"},
 	{"googlechat", "googlechat (Google Chat)"},
+	{"mattermost", "mattermost (Mattermost)"},
 	{"skip", "skip      (configure later)"},
 }
 
@@ -561,6 +580,8 @@ func stepPlatform(cfg *config.Config) {
 		stepMatrix(cfg)
 	case "googlechat":
 		stepGoogleChat(cfg)
+	case "mattermost":
+		stepMattermost(cfg)
 	case "skip":
 		fmt.Println("\n  > Platform configuration skipped")
 	}
@@ -645,6 +666,14 @@ func stepGoogleChat(cfg *config.Config) {
 	cfg.Platforms.GoogleChat.ProjectID = promptText("Google Chat Project ID", cfg.Platforms.GoogleChat.ProjectID)
 	cfg.Platforms.GoogleChat.CredentialsFile = promptText("Google Chat Credentials File", cfg.Platforms.GoogleChat.CredentialsFile)
 	fmt.Println("\n  > Google Chat configured")
+}
+
+func stepMattermost(cfg *config.Config) {
+	fmt.Println()
+	cfg.Platforms.Mattermost.ServerURL = promptText("Mattermost Server URL", cfg.Platforms.Mattermost.ServerURL)
+	cfg.Platforms.Mattermost.Token = promptText("Mattermost Token", cfg.Platforms.Mattermost.Token)
+	cfg.Platforms.Mattermost.TeamName = promptText("Mattermost Team Name", cfg.Platforms.Mattermost.TeamName)
+	fmt.Println("\n  > Mattermost configured")
 }
 
 func stepWeChat(cfg *config.Config) {

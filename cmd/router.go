@@ -20,6 +20,7 @@ import (
 	"github.com/pltanton/lingti-bot/internal/platforms/telegram"
 	"github.com/pltanton/lingti-bot/internal/platforms/wecom"
 	"github.com/pltanton/lingti-bot/internal/platforms/line"
+	"github.com/pltanton/lingti-bot/internal/platforms/mattermost"
 	"github.com/pltanton/lingti-bot/internal/platforms/matrix"
 	"github.com/pltanton/lingti-bot/internal/platforms/teams"
 	"github.com/pltanton/lingti-bot/internal/platforms/whatsapp"
@@ -53,6 +54,9 @@ var (
 	matrixAccessToken    string
 	googlechatProjectID       string
 	googlechatCredentialsFile string
+	mattermostServerURL  string
+	mattermostToken      string
+	mattermostTeamName   string
 	whatsappPhoneID      string
 	whatsappAccessToken  string
 	whatsappVerifyToken  string
@@ -118,6 +122,9 @@ func init() {
 	routerCmd.Flags().StringVar(&matrixAccessToken, "matrix-access-token", "", "Matrix Access Token (or MATRIX_ACCESS_TOKEN env)")
 	routerCmd.Flags().StringVar(&googlechatProjectID, "googlechat-project-id", "", "Google Chat Project ID (or GOOGLE_CHAT_PROJECT_ID env)")
 	routerCmd.Flags().StringVar(&googlechatCredentialsFile, "googlechat-credentials-file", "", "Google Chat Credentials File (or GOOGLE_CHAT_CREDENTIALS_FILE env)")
+	routerCmd.Flags().StringVar(&mattermostServerURL, "mattermost-server-url", "", "Mattermost Server URL (or MATTERMOST_SERVER_URL env)")
+	routerCmd.Flags().StringVar(&mattermostToken, "mattermost-token", "", "Mattermost Token (or MATTERMOST_TOKEN env)")
+	routerCmd.Flags().StringVar(&mattermostTeamName, "mattermost-team-name", "", "Mattermost Team Name (or MATTERMOST_TEAM_NAME env)")
 	routerCmd.Flags().StringVar(&whatsappPhoneID, "whatsapp-phone-id", "", "WhatsApp Phone Number ID (or WHATSAPP_PHONE_NUMBER_ID env)")
 	routerCmd.Flags().StringVar(&whatsappAccessToken, "whatsapp-access-token", "", "WhatsApp Access Token (or WHATSAPP_ACCESS_TOKEN env)")
 	routerCmd.Flags().StringVar(&whatsappVerifyToken, "whatsapp-verify-token", "", "WhatsApp Verify Token (or WHATSAPP_VERIFY_TOKEN env)")
@@ -175,6 +182,15 @@ func runRouter(cmd *cobra.Command, args []string) {
 	}
 	if dingtalkClientSecret == "" {
 		dingtalkClientSecret = os.Getenv("DINGTALK_CLIENT_SECRET")
+	}
+	if mattermostServerURL == "" {
+		mattermostServerURL = os.Getenv("MATTERMOST_SERVER_URL")
+	}
+	if mattermostToken == "" {
+		mattermostToken = os.Getenv("MATTERMOST_TOKEN")
+	}
+	if mattermostTeamName == "" {
+		mattermostTeamName = os.Getenv("MATTERMOST_TEAM_NAME")
 	}
 	if googlechatProjectID == "" {
 		googlechatProjectID = os.Getenv("GOOGLE_CHAT_PROJECT_ID")
@@ -305,6 +321,15 @@ func runRouter(cmd *cobra.Command, args []string) {
 		}
 		if dingtalkClientSecret == "" {
 			dingtalkClientSecret = savedCfg.Platforms.DingTalk.ClientSecret
+		}
+		if mattermostServerURL == "" {
+			mattermostServerURL = savedCfg.Platforms.Mattermost.ServerURL
+		}
+		if mattermostToken == "" {
+			mattermostToken = savedCfg.Platforms.Mattermost.Token
+		}
+		if mattermostTeamName == "" {
+			mattermostTeamName = savedCfg.Platforms.Mattermost.TeamName
 		}
 		if googlechatProjectID == "" {
 			googlechatProjectID = savedCfg.Platforms.GoogleChat.ProjectID
@@ -496,6 +521,22 @@ func runRouter(cmd *cobra.Command, args []string) {
 		r.Register(dingtalkPlatform)
 	} else {
 		logger.Info("DingTalk tokens not provided, skipping DingTalk integration")
+	}
+
+	// Register Mattermost if tokens are provided
+	if mattermostServerURL != "" && mattermostToken != "" {
+		mattermostPlatform, err := mattermost.New(mattermost.Config{
+			ServerURL: mattermostServerURL,
+			Token:     mattermostToken,
+			TeamName:  mattermostTeamName,
+		})
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error creating Mattermost platform: %v\n", err)
+			os.Exit(1)
+		}
+		r.Register(mattermostPlatform)
+	} else {
+		logger.Info("Mattermost tokens not provided, skipping Mattermost integration")
 	}
 
 	// Register Google Chat if tokens are provided

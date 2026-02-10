@@ -55,6 +55,7 @@ type PlatformConfig struct {
 	Teams    TeamsConfig    `yaml:"teams,omitempty"`
 	Matrix   MatrixConfig   `yaml:"matrix,omitempty"`
 	GoogleChat GoogleChatConfig `yaml:"googlechat,omitempty"`
+	Mattermost MattermostConfig `yaml:"mattermost,omitempty"`
 }
 
 type WeComConfig struct {
@@ -115,6 +116,12 @@ type MatrixConfig struct {
 type GoogleChatConfig struct {
 	ProjectID       string `yaml:"project_id,omitempty"`
 	CredentialsFile string `yaml:"credentials_file,omitempty"`
+}
+
+type MattermostConfig struct {
+	ServerURL string `yaml:"server_url,omitempty"`
+	Token     string `yaml:"token,omitempty"`
+	TeamName  string `yaml:"team_name,omitempty"`
 }
 
 type SecurityConfig struct {
