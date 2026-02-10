@@ -31,6 +31,12 @@ func (a *Agent) executeCronCreate(args map[string]any) string {
 		return "Error: schedule is required"
 	}
 
+	// Auto-upgrade: if AI sent 'message' but no 'prompt' or 'tool', treat message as prompt
+	if message != "" && prompt == "" && tool == "" {
+		prompt = message
+		message = ""
+	}
+
 	// Prompt-based job: run full AI conversation on schedule
 	if prompt != "" {
 		job, err := a.cronScheduler.AddJobWithPrompt(

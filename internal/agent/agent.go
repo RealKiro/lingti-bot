@@ -425,12 +425,7 @@ func (a *Agent) HandleMessage(ctx context.Context, msg router.Message) (router.R
 - music_search: Search and play
 
 ### Scheduled Tasks (Cron)
-- cron_create: Create ONE scheduled task. Use standard cron expressions (minute hour day month weekday).
-  IMPORTANT: Always create exactly ONE cron job per user request. Choose the right type:
-  - 'prompt': For dynamic/random/varied content (e.g., motivational quotes, news summaries, daily briefings). The AI runs a full conversation each time, so content is different every execution. This is the PREFERRED choice for most requests.
-  - 'message': For sending the exact same static text every time.
-  - 'tool'+'arguments': For executing a single specific MCP tool periodically.
-  NEVER create multiple cron jobs for one request. NEVER use shell_execute or file_write to implement cron - always use cron_create.
+- cron_create: Create ONE scheduled task with 'prompt' parameter. The AI runs a full conversation each trigger (can use web_search, weather, etc.) and sends the result to the user. For raw tool execution, use 'tool'+'arguments' instead.
 - cron_list: List all scheduled tasks with their status
 - cron_delete: Delete a scheduled task by ID
 - cron_pause: Pause a scheduled task
@@ -479,10 +474,9 @@ Then re-snapshot and continue.
 6. **NEVER claim success without tool execution** - If user asks to create/add/delete something, you MUST call the corresponding tool. Never say "已创建/已添加/已删除" unless you actually called the tool and it succeeded.
 7. **Date format for calendar** - When creating calendar events, use YYYY-MM-DD HH:MM format. Convert relative dates (明天/下周一) to absolute dates based on today's date.
 8. **CRITICAL: Cron job rules** - When user asks for periodic/scheduled tasks:
-   - Call cron_create EXACTLY ONCE. NEVER call it multiple times for one request.
-   - For dynamic/varied content (鸡汤、新闻、摘要、诗歌、技巧、简报、随机内容), ALWAYS use the 'prompt' parameter. Example: cron_create(name="motivation", schedule="43 * * * *", prompt="生成一条独特的编程激励鸡汤")
-   - For fixed/static reminders (提醒喝水、开会), use the 'message' parameter.
-   - NEVER create multiple message jobs to simulate randomness. NEVER use shell_execute or file_write for cron tasks.
+   - Call cron_create EXACTLY ONCE with the 'prompt' parameter.
+   - Example: cron_create(name="motivation", schedule="43 * * * *", prompt="生成一条独特的编程激励鸡汤，鼓励用户写代码创造新产品")
+   - NEVER call cron_create multiple times. NEVER use shell_execute or file_write for cron tasks.
 
 Current date: %s%s`, autoApprovalNotice, runtime.GOOS, runtime.GOARCH, homeDir, homeDir, homeDir, homeDir, msg.Username, time.Now().Format("2006-01-02"), thinkingPrompt)
 
@@ -1131,15 +1125,14 @@ func (a *Agent) buildToolsList() []Tool {
 		// === SCHEDULED TASKS (CRON) ===
 		{
 			Name:        "cron_create",
-			Description: "Create exactly ONE scheduled task per user request. Use 'prompt' for dynamic/varied content (motivational quotes, news, briefings - AI generates fresh content each time). Use 'message' only for identical static text every time. Use 'tool'+'arguments' for a single MCP tool. NEVER create multiple jobs for one request. Schedule uses standard 5-field cron: minute hour day month weekday.",
+			Description: "Create ONE scheduled task. Use 'prompt' to describe what the AI should do each time (generate text, search web, check weather, etc.). The AI runs a full conversation each trigger, so content is fresh every time. Use 'tool'+'arguments' only for raw MCP tool execution without AI. Schedule uses standard 5-field cron: minute hour day month weekday.",
 			InputSchema: jsonSchema(map[string]any{
 				"type": "object",
 				"properties": map[string]any{
 					"name":      map[string]string{"type": "string", "description": "Human-readable task name"},
-					"schedule":  map[string]string{"type": "string", "description": "Cron expression (e.g., '*/5 * * * *' for every 5 minutes, '0 9 * * 1-5' for weekdays at 9am)"},
-					"prompt":    map[string]string{"type": "string", "description": "AI prompt to execute periodically (runs full AI conversation with tools like web_search, web_fetch, etc. and sends result to user)"},
-					"message":   map[string]string{"type": "string", "description": "Message to send to the user periodically (for static message tasks)"},
-					"tool":      map[string]string{"type": "string", "description": "MCP tool to execute periodically (for single tool tasks)"},
+					"schedule":  map[string]string{"type": "string", "description": "Cron expression (e.g., '43 * * * *' for every hour at :43, '0 9 * * 1-5' for weekdays at 9am)"},
+					"prompt":    map[string]string{"type": "string", "description": "What the AI should do each time this job triggers. AI runs a full conversation and sends the result to the user. Example: '生成一条独特的编程激励鸡汤'"},
+					"tool":      map[string]string{"type": "string", "description": "MCP tool to execute periodically (for raw tool execution without AI)"},
 					"arguments": map[string]string{"type": "object", "description": "Arguments for the tool (when using tool parameter)"},
 				},
 				"required": []string{"name", "schedule"},
