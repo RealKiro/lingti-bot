@@ -17,6 +17,11 @@ type ToolExecutor interface {
 	ExecuteTool(ctx context.Context, toolName string, arguments map[string]any) (any, error)
 }
 
+// PromptExecutor interface for running full AI conversations
+type PromptExecutor interface {
+	ExecutePrompt(ctx context.Context, platform, channelID, userID, prompt string) (string, error)
+}
+
 // ChatNotifier interface for sending messages to chat
 type ChatNotifier interface {
 	NotifyChat(message string) error
@@ -25,22 +30,24 @@ type ChatNotifier interface {
 
 // Scheduler manages scheduled jobs
 type Scheduler struct {
-	cron         *cron.Cron
-	store        *Store
-	toolExecutor ToolExecutor
-	chatNotifier ChatNotifier
-	jobs         map[string]*Job
-	mu           sync.RWMutex
+	cron           *cron.Cron
+	store          *Store
+	toolExecutor   ToolExecutor
+	promptExecutor PromptExecutor
+	chatNotifier   ChatNotifier
+	jobs           map[string]*Job
+	mu             sync.RWMutex
 }
 
 // NewScheduler creates a new scheduler
-func NewScheduler(store *Store, toolExecutor ToolExecutor, chatNotifier ChatNotifier) *Scheduler {
+func NewScheduler(store *Store, toolExecutor ToolExecutor, promptExecutor PromptExecutor, chatNotifier ChatNotifier) *Scheduler {
 	return &Scheduler{
-		cron:         cron.New(cron.WithSeconds()), // Support second-level precision
-		store:        store,
-		toolExecutor: toolExecutor,
-		chatNotifier: chatNotifier,
-		jobs:         make(map[string]*Job),
+		cron:           cron.New(cron.WithSeconds()), // Support second-level precision
+		store:          store,
+		toolExecutor:   toolExecutor,
+		promptExecutor: promptExecutor,
+		chatNotifier:   chatNotifier,
+		jobs:           make(map[string]*Job),
 	}
 }
 
@@ -107,6 +114,18 @@ func (s *Scheduler) AddJobWithMessage(name, schedule, message, platform, channel
 		Name:      name,
 		Schedule:  schedule,
 		Message:   message,
+		Platform:  platform,
+		ChannelID: channelID,
+		UserID:    userID,
+	})
+}
+
+// AddJobWithPrompt adds a new prompt-based job that runs a full AI conversation
+func (s *Scheduler) AddJobWithPrompt(name, schedule, prompt, platform, channelID, userID string) (*Job, error) {
+	return s.addJob(&Job{
+		Name:      name,
+		Schedule:  schedule,
+		Prompt:    prompt,
 		Platform:  platform,
 		ChannelID: channelID,
 		UserID:    userID,
@@ -293,6 +312,56 @@ func (s *Scheduler) executeJob(job *Job) {
 			log.Printf("[CRON] Job %s has no chat target, logging message: %s", job.ID, job.Message)
 			if s.chatNotifier != nil {
 				s.chatNotifier.NotifyChat(fmt.Sprintf("[%s] %s", job.Name, job.Message))
+			}
+		}
+
+		if err := s.saveJobs(); err != nil {
+			log.Printf("[CRON] Failed to save jobs: %v", err)
+		}
+		return
+	}
+
+	// Prompt-based job: run full AI conversation
+	if job.Prompt != "" {
+		log.Printf("[CRON] Running AI prompt for job: %s (%s)", job.ID, job.Name)
+
+		s.mu.Lock()
+		job.LastRun = &now
+		s.mu.Unlock()
+
+		if s.promptExecutor == nil {
+			s.mu.Lock()
+			job.LastError = "prompt executor not available"
+			s.mu.Unlock()
+			log.Printf("[CRON] Job failed: %s (%s) - prompt executor not available", job.ID, job.Name)
+			if err := s.saveJobs(); err != nil {
+				log.Printf("[CRON] Failed to save jobs: %v", err)
+			}
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer cancel()
+
+		result, err := s.promptExecutor.ExecutePrompt(ctx, job.Platform, job.ChannelID, job.UserID, job.Prompt)
+		if err != nil {
+			s.mu.Lock()
+			job.LastError = err.Error()
+			s.mu.Unlock()
+			log.Printf("[CRON] Job prompt failed: %s (%s) - error: %v", job.ID, job.Name, err)
+
+			if s.chatNotifier != nil && job.Platform != "" && job.ChannelID != "" {
+				s.chatNotifier.NotifyChatUser(job.Platform, job.ChannelID, job.UserID,
+					fmt.Sprintf("⚠️ Scheduled AI task '%s' failed: %v", job.Name, err))
+			}
+		} else {
+			s.mu.Lock()
+			job.LastError = ""
+			s.mu.Unlock()
+			log.Printf("[CRON] Job prompt completed: %s (%s)", job.ID, job.Name)
+
+			if s.chatNotifier != nil && job.Platform != "" && job.ChannelID != "" {
+				s.chatNotifier.NotifyChatUser(job.Platform, job.ChannelID, job.UserID, result)
 			}
 		}
 

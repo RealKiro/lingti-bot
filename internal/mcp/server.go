@@ -59,7 +59,7 @@ func NewServer() *Server {
 	cronPath := filepath.Join(cronDir, "crons.json")
 
 	cronStore := cronpkg.NewStore(cronPath)
-	s.cronScheduler = cronpkg.NewScheduler(cronStore, s, s)
+	s.cronScheduler = cronpkg.NewScheduler(cronStore, s, nil, s)
 
 	// Register cron tools
 	registerCronTools(s)

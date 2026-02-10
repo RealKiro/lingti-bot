@@ -16,12 +16,25 @@ func (a *Agent) executeCronCreate(args map[string]any) string {
 	schedule, _ := args["schedule"].(string)
 	message, _ := args["message"].(string)
 	tool, _ := args["tool"].(string)
+	prompt, _ := args["prompt"].(string)
 
 	if name == "" {
 		return "Error: name is required"
 	}
 	if schedule == "" {
 		return "Error: schedule is required"
+	}
+
+	// Prompt-based job: run full AI conversation on schedule
+	if prompt != "" {
+		job, err := a.cronScheduler.AddJobWithPrompt(
+			name, schedule, prompt,
+			a.currentMsg.Platform, a.currentMsg.ChannelID, a.currentMsg.UserID,
+		)
+		if err != nil {
+			return fmt.Sprintf("Error creating scheduled task: %v", err)
+		}
+		return fmt.Sprintf("Scheduled AI task created:\n- ID: %s\n- Name: %s\n- Schedule: %s\n- Prompt: %s", job.ID, job.Name, job.Schedule, job.Prompt)
 	}
 
 	// Message-based job
@@ -57,7 +70,7 @@ func (a *Agent) executeCronCreate(args map[string]any) string {
 		return fmt.Sprintf("Scheduled task created:\n- ID: %s\n- Name: %s\n- Schedule: %s\n- Tool: %s", job.ID, job.Name, job.Schedule, job.Tool)
 	}
 
-	return "Error: either 'message' or 'tool' is required"
+	return "Error: either 'prompt', 'message', or 'tool' is required"
 }
 
 // executeCronList lists all scheduled tasks
@@ -80,6 +93,9 @@ func (a *Agent) executeCronList() string {
 		}
 
 		sb.WriteString(fmt.Sprintf("- ID: %s\n  Name: %s\n  Schedule: %s\n  Status: %s\n", job.ID, job.Name, job.Schedule, status))
+		if job.Prompt != "" {
+			sb.WriteString(fmt.Sprintf("  Prompt: %s\n", job.Prompt))
+		}
 		if job.Message != "" {
 			sb.WriteString(fmt.Sprintf("  Message: %s\n", job.Message))
 		}

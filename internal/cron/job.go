@@ -14,6 +14,7 @@ type Job struct {
 	Tool      string         `json:"tool,omitempty"`      // MCP tool to execute
 	Arguments map[string]any `json:"arguments,omitempty"` // Tool arguments
 	Message   string         `json:"message,omitempty"`   // Direct message to send (no tool execution)
+	Prompt    string         `json:"prompt,omitempty"`    // AI prompt to execute (full conversation with tools)
 	Platform  string         `json:"platform,omitempty"`  // Target platform ("slack", "wecom", etc.)
 	ChannelID string         `json:"channel_id,omitempty"` // Target channel/user to send to
 	UserID    string         `json:"user_id,omitempty"`   // User who created the job
@@ -34,6 +35,7 @@ func (j *Job) Clone() *Job {
 		Schedule:  j.Schedule,
 		Tool:      j.Tool,
 		Message:   j.Message,
+		Prompt:    j.Prompt,
 		Platform:  j.Platform,
 		ChannelID: j.ChannelID,
 		UserID:    j.UserID,

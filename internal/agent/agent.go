@@ -285,6 +285,23 @@ func (a *Agent) ExecuteTool(ctx context.Context, toolName string, arguments map[
 	return result, nil
 }
 
+// ExecutePrompt runs a full AI conversation with tools and returns the text response.
+// Used by cron scheduler for prompt-based jobs.
+func (a *Agent) ExecutePrompt(ctx context.Context, platform, channelID, userID, prompt string) (string, error) {
+	msg := router.Message{
+		Platform:  platform,
+		ChannelID: channelID,
+		UserID:    userID,
+		Username:  "cron",
+		Text:      prompt,
+	}
+	resp, err := a.HandleMessage(ctx, msg)
+	if err != nil {
+		return "", err
+	}
+	return resp.Text, nil
+}
+
 // HandleMessage processes a message and returns a response
 func (a *Agent) HandleMessage(ctx context.Context, msg router.Message) (router.Response, error) {
 	a.currentMsg = msg
@@ -406,7 +423,7 @@ func (a *Agent) HandleMessage(ctx context.Context, msg router.Message) (router.R
 - music_search: Search and play
 
 ### Scheduled Tasks (Cron)
-- cron_create: Create a scheduled task (send message or run tool periodically). Use standard cron expressions (minute hour day month weekday). For message tasks, set message parameter. For tool tasks, set tool and arguments parameters.
+- cron_create: Create a scheduled task. Use standard cron expressions (minute hour day month weekday). For AI tasks (search web, summarize, etc.), set prompt parameter. For static message tasks, set message parameter. For single tool tasks, set tool and arguments parameters.
 - cron_list: List all scheduled tasks with their status
 - cron_delete: Delete a scheduled task by ID
 - cron_pause: Pause a scheduled task
@@ -1102,14 +1119,15 @@ func (a *Agent) buildToolsList() []Tool {
 		// === SCHEDULED TASKS (CRON) ===
 		{
 			Name:        "cron_create",
-			Description: "Create a scheduled task. Use 'message' for periodic messages to the user, or 'tool'+'arguments' for periodic tool execution. Schedule uses standard 5-field cron: minute hour day month weekday.",
+			Description: "Create a scheduled task. Use 'prompt' to run a full AI conversation with tools (e.g., search web, fetch content, summarize) on schedule. Use 'message' for periodic static messages. Use 'tool'+'arguments' for periodic single tool execution. Schedule uses standard 5-field cron: minute hour day month weekday.",
 			InputSchema: jsonSchema(map[string]any{
 				"type": "object",
 				"properties": map[string]any{
 					"name":      map[string]string{"type": "string", "description": "Human-readable task name"},
 					"schedule":  map[string]string{"type": "string", "description": "Cron expression (e.g., '*/5 * * * *' for every 5 minutes, '0 9 * * 1-5' for weekdays at 9am)"},
-					"message":   map[string]string{"type": "string", "description": "Message to send to the user periodically (for message-based tasks)"},
-					"tool":      map[string]string{"type": "string", "description": "MCP tool to execute periodically (for tool-based tasks)"},
+					"prompt":    map[string]string{"type": "string", "description": "AI prompt to execute periodically (runs full AI conversation with tools like web_search, web_fetch, etc. and sends result to user)"},
+					"message":   map[string]string{"type": "string", "description": "Message to send to the user periodically (for static message tasks)"},
+					"tool":      map[string]string{"type": "string", "description": "MCP tool to execute periodically (for single tool tasks)"},
 					"arguments": map[string]string{"type": "object", "description": "Arguments for the tool (when using tool parameter)"},
 				},
 				"required": []string{"name", "schedule"},
