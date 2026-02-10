@@ -57,6 +57,9 @@ var (
 	onboardMatrixHomeserverURL string
 	onboardMatrixUserID        string
 	onboardMatrixAccessToken   string
+	// Google Chat
+	onboardGoogleChatProjectID       string
+	onboardGoogleChatCredentialsFile string
 )
 
 var onboardCmd = &cobra.Command{
@@ -123,6 +126,9 @@ func init() {
 	onboardCmd.Flags().StringVar(&onboardMatrixHomeserverURL, "matrix-homeserver-url", "", "Matrix Homeserver URL")
 	onboardCmd.Flags().StringVar(&onboardMatrixUserID, "matrix-user-id", "", "Matrix User ID")
 	onboardCmd.Flags().StringVar(&onboardMatrixAccessToken, "matrix-access-token", "", "Matrix Access Token")
+	// Google Chat
+	onboardCmd.Flags().StringVar(&onboardGoogleChatProjectID, "googlechat-project-id", "", "Google Chat Project ID")
+	onboardCmd.Flags().StringVar(&onboardGoogleChatCredentialsFile, "googlechat-credentials-file", "", "Google Chat Credentials File")
 }
 
 var scanner *bufio.Scanner
@@ -309,6 +315,13 @@ func applyOnboardFlags(cfg *config.Config) {
 		}
 		if onboardMatrixAccessToken != "" {
 			cfg.Platforms.Matrix.AccessToken = onboardMatrixAccessToken
+		}
+	case "googlechat":
+		if onboardGoogleChatProjectID != "" {
+			cfg.Platforms.GoogleChat.ProjectID = onboardGoogleChatProjectID
+		}
+		if onboardGoogleChatCredentialsFile != "" {
+			cfg.Platforms.GoogleChat.CredentialsFile = onboardGoogleChatCredentialsFile
 		}
 	}
 }
@@ -508,6 +521,7 @@ var platformOptions = []platformInfo{
 	{"line", "line      (LINE)"},
 	{"teams", "teams     (Microsoft Teams)"},
 	{"matrix", "matrix    (Matrix/Element)"},
+	{"googlechat", "googlechat (Google Chat)"},
 	{"skip", "skip      (configure later)"},
 }
 
@@ -545,6 +559,8 @@ func stepPlatform(cfg *config.Config) {
 		stepTeams(cfg)
 	case "matrix":
 		stepMatrix(cfg)
+	case "googlechat":
+		stepGoogleChat(cfg)
 	case "skip":
 		fmt.Println("\n  > Platform configuration skipped")
 	}
@@ -622,6 +638,13 @@ func stepMatrix(cfg *config.Config) {
 	cfg.Platforms.Matrix.UserID = promptText("Matrix User ID (@bot:server)", cfg.Platforms.Matrix.UserID)
 	cfg.Platforms.Matrix.AccessToken = promptText("Matrix Access Token", cfg.Platforms.Matrix.AccessToken)
 	fmt.Println("\n  > Matrix configured")
+}
+
+func stepGoogleChat(cfg *config.Config) {
+	fmt.Println()
+	cfg.Platforms.GoogleChat.ProjectID = promptText("Google Chat Project ID", cfg.Platforms.GoogleChat.ProjectID)
+	cfg.Platforms.GoogleChat.CredentialsFile = promptText("Google Chat Credentials File", cfg.Platforms.GoogleChat.CredentialsFile)
+	fmt.Println("\n  > Google Chat configured")
 }
 
 func stepWeChat(cfg *config.Config) {

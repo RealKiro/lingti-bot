@@ -54,6 +54,7 @@ type PlatformConfig struct {
 	LINE     LINEConfig     `yaml:"line,omitempty"`
 	Teams    TeamsConfig    `yaml:"teams,omitempty"`
 	Matrix   MatrixConfig   `yaml:"matrix,omitempty"`
+	GoogleChat GoogleChatConfig `yaml:"googlechat,omitempty"`
 }
 
 type WeComConfig struct {
@@ -109,6 +110,11 @@ type MatrixConfig struct {
 	HomeserverURL string `yaml:"homeserver_url,omitempty"`
 	UserID        string `yaml:"user_id,omitempty"`
 	AccessToken   string `yaml:"access_token,omitempty"`
+}
+
+type GoogleChatConfig struct {
+	ProjectID       string `yaml:"project_id,omitempty"`
+	CredentialsFile string `yaml:"credentials_file,omitempty"`
 }
 
 type SecurityConfig struct {

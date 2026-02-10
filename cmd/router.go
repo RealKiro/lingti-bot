@@ -15,6 +15,7 @@ import (
 	"github.com/pltanton/lingti-bot/internal/platforms/dingtalk"
 	"github.com/pltanton/lingti-bot/internal/platforms/discord"
 	"github.com/pltanton/lingti-bot/internal/platforms/feishu"
+	"github.com/pltanton/lingti-bot/internal/platforms/googlechat"
 	"github.com/pltanton/lingti-bot/internal/platforms/slack"
 	"github.com/pltanton/lingti-bot/internal/platforms/telegram"
 	"github.com/pltanton/lingti-bot/internal/platforms/wecom"
@@ -50,6 +51,8 @@ var (
 	matrixHomeserverURL  string
 	matrixUserID         string
 	matrixAccessToken    string
+	googlechatProjectID       string
+	googlechatCredentialsFile string
 	whatsappPhoneID      string
 	whatsappAccessToken  string
 	whatsappVerifyToken  string
@@ -113,6 +116,8 @@ func init() {
 	routerCmd.Flags().StringVar(&matrixHomeserverURL, "matrix-homeserver-url", "", "Matrix Homeserver URL (or MATRIX_HOMESERVER_URL env)")
 	routerCmd.Flags().StringVar(&matrixUserID, "matrix-user-id", "", "Matrix User ID (or MATRIX_USER_ID env)")
 	routerCmd.Flags().StringVar(&matrixAccessToken, "matrix-access-token", "", "Matrix Access Token (or MATRIX_ACCESS_TOKEN env)")
+	routerCmd.Flags().StringVar(&googlechatProjectID, "googlechat-project-id", "", "Google Chat Project ID (or GOOGLE_CHAT_PROJECT_ID env)")
+	routerCmd.Flags().StringVar(&googlechatCredentialsFile, "googlechat-credentials-file", "", "Google Chat Credentials File (or GOOGLE_CHAT_CREDENTIALS_FILE env)")
 	routerCmd.Flags().StringVar(&whatsappPhoneID, "whatsapp-phone-id", "", "WhatsApp Phone Number ID (or WHATSAPP_PHONE_NUMBER_ID env)")
 	routerCmd.Flags().StringVar(&whatsappAccessToken, "whatsapp-access-token", "", "WhatsApp Access Token (or WHATSAPP_ACCESS_TOKEN env)")
 	routerCmd.Flags().StringVar(&whatsappVerifyToken, "whatsapp-verify-token", "", "WhatsApp Verify Token (or WHATSAPP_VERIFY_TOKEN env)")
@@ -170,6 +175,12 @@ func runRouter(cmd *cobra.Command, args []string) {
 	}
 	if dingtalkClientSecret == "" {
 		dingtalkClientSecret = os.Getenv("DINGTALK_CLIENT_SECRET")
+	}
+	if googlechatProjectID == "" {
+		googlechatProjectID = os.Getenv("GOOGLE_CHAT_PROJECT_ID")
+	}
+	if googlechatCredentialsFile == "" {
+		googlechatCredentialsFile = os.Getenv("GOOGLE_CHAT_CREDENTIALS_FILE")
 	}
 	if matrixHomeserverURL == "" {
 		matrixHomeserverURL = os.Getenv("MATRIX_HOMESERVER_URL")
@@ -294,6 +305,12 @@ func runRouter(cmd *cobra.Command, args []string) {
 		}
 		if dingtalkClientSecret == "" {
 			dingtalkClientSecret = savedCfg.Platforms.DingTalk.ClientSecret
+		}
+		if googlechatProjectID == "" {
+			googlechatProjectID = savedCfg.Platforms.GoogleChat.ProjectID
+		}
+		if googlechatCredentialsFile == "" {
+			googlechatCredentialsFile = savedCfg.Platforms.GoogleChat.CredentialsFile
 		}
 		if matrixHomeserverURL == "" {
 			matrixHomeserverURL = savedCfg.Platforms.Matrix.HomeserverURL
@@ -479,6 +496,21 @@ func runRouter(cmd *cobra.Command, args []string) {
 		r.Register(dingtalkPlatform)
 	} else {
 		logger.Info("DingTalk tokens not provided, skipping DingTalk integration")
+	}
+
+	// Register Google Chat if tokens are provided
+	if googlechatProjectID != "" {
+		googlechatPlatform, err := googlechat.New(googlechat.Config{
+			ProjectID:       googlechatProjectID,
+			CredentialsFile: googlechatCredentialsFile,
+		})
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error creating Google Chat platform: %v\n", err)
+			os.Exit(1)
+		}
+		r.Register(googlechatPlatform)
+	} else {
+		logger.Info("Google Chat tokens not provided, skipping Google Chat integration")
 	}
 
 	// Register Matrix if tokens are provided
