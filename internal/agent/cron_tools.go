@@ -31,9 +31,10 @@ func (a *Agent) executeCronCreate(args map[string]any) string {
 		return "Error: schedule is required"
 	}
 
-	// Auto-upgrade: if AI sent 'message' but no 'prompt' or 'tool', treat message as prompt
+	// Auto-upgrade: if AI sent 'message' but no 'prompt' or 'tool',
+	// wrap the message in a generation instruction so AI creates fresh content each time
 	if message != "" && prompt == "" && tool == "" {
-		prompt = message
+		prompt = fmt.Sprintf("用户想要定期收到类似以下风格的内容，请每次生成一条全新的、独特的、不重复的内容：\n%s", message)
 		message = ""
 	}
 
