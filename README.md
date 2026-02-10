@@ -19,7 +19,7 @@
 - 🛠️ **75+ MCP 工具** — 覆盖文件、Shell、系统、网络、日历、Git、GitHub 等全场景
 - 🌏 **中国平台原生支持** — 钉钉、飞书、企业微信、微信公众号开箱即用
 - 🔌 **嵌入式友好** — 可编译到 ARM/MIPS，轻松部署到树莓派、路由器、NAS
-- 🧠 **多 AI 后端** — 集成 Claude、DeepSeek、Kimi、MiniMax、Gemini 等，按需切换
+- 🧠 **多 AI 后端** — 集成 Claude、DeepSeek、Kimi、MiniMax、Gemini 等 [15 种 AI 服务](docs/ai-providers.md)，按需切换
 
 支持钉钉、飞书、企业微信、微信公众号、Slack、Telegram、Discord 等平台接入，既可通过**云中继 5 分钟秒接**，也可 [OpenClaw](docs/openclaw-reference.md) 式**传统自建部署**。查看 [开发路线图](docs/roadmap.md) 了解更多功能规划。
 
@@ -283,7 +283,7 @@ cron_delete(id="job-id-here")
 |------|------|
 | **上下文记忆** | 每个用户独立的对话上下文，最近 50 条消息 |
 | **自动过期** | 对话 60 分钟无活动后自动清除 |
-| **多 AI 后端** | Claude、DeepSeek、Kimi、MiniMax 按需切换 |
+| **多 AI 后端** | [15 种 AI 服务](docs/ai-providers.md)按需切换 |
 | **对话管理** | `/new`、`/reset`、`新对话` 命令重置对话 |
 
 ### 语音交互 — 解放双手，畅快对话
@@ -330,7 +330,7 @@ lingti-bot skills info github
 | **多平台消息网关** | 消息平台集成 | 微信公众号、企业微信、Slack、飞书一键接入，支持云中继 |
 | **MCP 工具集** | 75+ 本地系统工具 | 文件、Shell、系统、网络、日历、Git、GitHub 等全覆盖 |
 | **Skills** | 模块化能力扩展 | 8 个内置 Skill，支持自定义和项目级扩展 |
-| **智能对话** | 多轮对话与记忆 | 上下文记忆、多 AI 后端（Claude/DeepSeek/Kimi/MiniMax） |
+| **智能对话** | 多轮对话与记忆 | 上下文记忆、[15 种 AI 后端](docs/ai-providers.md) |
 | **语音交互** | 语音输入/输出 | 本地 whisper-cpp、OpenAI、ElevenLabs 多引擎支持 |
 
 ## 云中继：零门槛接入企业消息平台
@@ -587,35 +587,39 @@ export FEISHU_APP_SECRET="..."
 
 ### 多 AI 后端
 
-支持多种 AI 服务，按需切换：
+支持 **15 种 AI 服务**，涵盖国内外主流大模型平台，按需切换：
 
-| AI 服务 | 环境变量 | Provider 参数 | 默认模型 |
-|---------|----------|--------------|----------|
-| **Claude** (Anthropic) | `ANTHROPIC_API_KEY` | `claude` / `anthropic` | claude-sonnet-4.5 |
-| **Kimi** (月之暗面) | `KIMI_API_KEY` | `kimi` / `moonshot` | moonshot-v1-8k |
-| **DeepSeek** | `DEEPSEEK_API_KEY` | `deepseek` | deepseek-chat |
-| **Qwen** (通义千问) | `QWEN_API_KEY` | `qwen` / `qianwen` / `tongyi` | qwen-plus |
+| # | Provider | 名称 | 默认模型 |
+|---|----------|------|----------|
+| 1 | `deepseek` | DeepSeek (推荐) | `deepseek-chat` |
+| 2 | `qwen` | 通义千问 (Qwen) | `qwen-plus` |
+| 3 | `claude` | Claude (Anthropic) | `claude-sonnet-4-20250514` |
+| 4 | `kimi` | Kimi / 月之暗面 | `moonshot-v1-8k` |
+| 5 | `minimax` | MiniMax / 海螺 AI | `MiniMax-Text-01` |
+| 6 | `doubao` | 豆包 (ByteDance) | `doubao-pro-32k` |
+| 7 | `zhipu` | 智谱 GLM | `glm-4-flash` |
+| 8 | `openai` | OpenAI (GPT) | `gpt-4o` |
+| 9 | `gemini` | Gemini (Google) | `gemini-2.0-flash` |
+| 10 | `yi` | 零一万物 (Yi) | `yi-large` |
+| 11 | `stepfun` | 阶跃星辰 (StepFun) | `step-2-16k` |
+| 12 | `baichuan` | 百川智能 (Baichuan) | `Baichuan4` |
+| 13 | `spark` | 讯飞星火 (iFlytek) | `generalv3.5` |
+| 14 | `siliconflow` | 硅基流动 (aggregator) | `Qwen/Qwen2.5-72B-Instruct` |
+| 15 | `grok` | Grok (xAI) | `grok-2-latest` |
 
-**千问使用示例：**
+> 完整列表（含 API Key 获取链接、别名）：[AI 服务列表](docs/ai-providers.md)
 
 ```bash
-# 使用环境变量
-export QWEN_API_KEY="sk-your-qwen-api-key"
-lingti-bot router --provider qwen
+# 使用命令行参数指定
+lingti-bot router --provider qwen --api-key "sk-xxx" --model "qwen-plus"
 
-# 使用命令行参数
-lingti-bot router \
-  --provider qwen \
-  --api-key "sk-your-qwen-api-key" \
-  --model "qwen-plus"
-
-# 可用模型：qwen-plus（推荐）、qwen-turbo、qwen-max、qwen-long
+# 覆盖默认模型
+lingti-bot relay --provider openai --api-key "sk-xxx" --model "gpt-4o-mini"
 ```
-
-获取千问 API Key：访问 [阿里云百炼平台](https://bailian.console.aliyun.com/) 创建 DashScope API Key。
 
 ### 详细文档
 
+- [AI 服务列表](docs/ai-providers.md) - 15 种 AI 服务详情、API Key 获取、别名
 - [命令行参考](docs/cli-reference.md) - 完整的命令行使用文档
 - [Skills 指南](docs/skills.md) - Skills 系统详解：创建、发现、配置
 - [Slack 集成指南](docs/slack-integration.md) - 完整的 Slack 应用配置教程

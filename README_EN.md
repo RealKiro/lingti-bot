@@ -19,7 +19,7 @@ English | [中文](./README.md)
 - 🛠️ **75+ MCP Tools** — Covers files, Shell, system, network, calendar, Git, GitHub, and more
 - 🌏 **China Platform Native** — DingTalk, Feishu, WeCom, WeChat Official Account ready out-of-box
 - 🔌 **Embedded Friendly** — Compile to ARM/MIPS, easy deployment to Raspberry Pi, routers, NAS
-- 🧠 **Multi-AI Backend** — Integrated with Claude, DeepSeek, Kimi, MiniMax, Gemini, switchable on demand
+- 🧠 **Multi-AI Backend** — [15 AI providers](docs/ai-providers.md) including Claude, DeepSeek, Kimi, MiniMax, Gemini, OpenAI, and more
 
 Supports DingTalk, Feishu, WeCom, WeChat Official Account, Slack, Telegram, Discord and more. Either **5-minute cloud relay** or [OpenClaw](docs/openclaw-reference.md)-style **self-hosted deployment**. Check [Roadmap](docs/roadmap.md) for more features.
 
@@ -255,35 +255,39 @@ See [Skills Guide](docs/skills.md) for full documentation.
 
 ### Multi-AI Backend
 
-Support multiple AI services, switch on demand:
+Supports **15 AI providers** covering mainstream LLM platforms globally:
 
-| AI Service | Environment Variable | Provider Parameter | Default Model |
-|------------|---------------------|-------------------|---------------|
-| **Claude** (Anthropic) | `ANTHROPIC_API_KEY` | `claude` / `anthropic` | claude-sonnet-4.5 |
-| **Kimi** (Moonshot) | `KIMI_API_KEY` | `kimi` / `moonshot` | moonshot-v1-8k |
-| **DeepSeek** | `DEEPSEEK_API_KEY` | `deepseek` | deepseek-chat |
-| **Qwen** (Qianwen/通义千问) | `QWEN_API_KEY` | `qwen` / `qianwen` / `tongyi` | qwen-plus |
+| # | Provider | Name | Default Model |
+|---|----------|------|---------------|
+| 1 | `deepseek` | DeepSeek (recommended) | `deepseek-chat` |
+| 2 | `qwen` | Qwen / 通义千问 | `qwen-plus` |
+| 3 | `claude` | Claude (Anthropic) | `claude-sonnet-4-20250514` |
+| 4 | `kimi` | Kimi / Moonshot | `moonshot-v1-8k` |
+| 5 | `minimax` | MiniMax / 海螺 AI | `MiniMax-Text-01` |
+| 6 | `doubao` | Doubao / 豆包 (ByteDance) | `doubao-pro-32k` |
+| 7 | `zhipu` | Zhipu GLM / 智谱 | `glm-4-flash` |
+| 8 | `openai` | OpenAI (GPT) | `gpt-4o` |
+| 9 | `gemini` | Gemini (Google) | `gemini-2.0-flash` |
+| 10 | `yi` | Yi / 零一万物 | `yi-large` |
+| 11 | `stepfun` | StepFun / 阶跃星辰 | `step-2-16k` |
+| 12 | `baichuan` | Baichuan / 百川智能 | `Baichuan4` |
+| 13 | `spark` | Spark / 讯飞星火 (iFlytek) | `generalv3.5` |
+| 14 | `siliconflow` | SiliconFlow / 硅基流动 (aggregator) | `Qwen/Qwen2.5-72B-Instruct` |
+| 15 | `grok` | Grok (xAI) | `grok-2-latest` |
 
-**Qwen Usage Example:**
+> Full list with API key links and aliases: [AI Providers](docs/ai-providers.md)
 
 ```bash
-# Using environment variable
-export QWEN_API_KEY="sk-your-qwen-api-key"
-lingti-bot router --provider qwen
+# Specify provider via command line
+lingti-bot router --provider qwen --api-key "sk-xxx" --model "qwen-plus"
 
-# Using command line parameters
-lingti-bot router \
-  --provider qwen \
-  --api-key "sk-your-qwen-api-key" \
-  --model "qwen-plus"
-
-# Available models: qwen-plus (recommended), qwen-turbo, qwen-max, qwen-long
+# Override default model
+lingti-bot relay --provider openai --api-key "sk-xxx" --model "gpt-4o-mini"
 ```
-
-Get Qwen API Key: Visit [Alibaba Cloud Bailian Platform](https://bailian.console.aliyun.com/) to create a DashScope API Key.
 
 ## Documentation
 
+- [AI Providers](docs/ai-providers.md) - 15 supported AI providers with API key links and aliases
 - [CLI Reference](docs/cli-reference.md) - Complete CLI documentation
 - [Skills Guide](docs/skills.md) - Modular capability packs: create, discover, manage skills
 - [Slack Integration Guide](docs/slack-integration.md) - Complete Slack app configuration tutorial
