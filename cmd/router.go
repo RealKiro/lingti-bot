@@ -22,6 +22,7 @@ import (
 	"github.com/pltanton/lingti-bot/internal/platforms/wecom"
 	"github.com/pltanton/lingti-bot/internal/platforms/line"
 	"github.com/pltanton/lingti-bot/internal/platforms/mattermost"
+	"github.com/pltanton/lingti-bot/internal/platforms/nextcloud"
 	"github.com/pltanton/lingti-bot/internal/platforms/nostr"
 	signalplatform "github.com/pltanton/lingti-bot/internal/platforms/signal"
 	"github.com/pltanton/lingti-bot/internal/platforms/zalo"
@@ -74,6 +75,10 @@ var (
 	zaloAppID            string
 	zaloSecretKey        string
 	zaloAccessToken      string
+	nextcloudServerURL   string
+	nextcloudUsername    string
+	nextcloudPassword    string
+	nextcloudRoomToken   string
 	whatsappPhoneID      string
 	whatsappAccessToken  string
 	whatsappVerifyToken  string
@@ -154,6 +159,10 @@ func init() {
 	routerCmd.Flags().StringVar(&zaloAppID, "zalo-app-id", "", "Zalo App ID (or ZALO_APP_ID env)")
 	routerCmd.Flags().StringVar(&zaloSecretKey, "zalo-secret-key", "", "Zalo Secret Key (or ZALO_SECRET_KEY env)")
 	routerCmd.Flags().StringVar(&zaloAccessToken, "zalo-access-token", "", "Zalo Access Token (or ZALO_ACCESS_TOKEN env)")
+	routerCmd.Flags().StringVar(&nextcloudServerURL, "nextcloud-server-url", "", "Nextcloud Server URL (or NEXTCLOUD_SERVER_URL env)")
+	routerCmd.Flags().StringVar(&nextcloudUsername, "nextcloud-username", "", "Nextcloud Username (or NEXTCLOUD_USERNAME env)")
+	routerCmd.Flags().StringVar(&nextcloudPassword, "nextcloud-password", "", "Nextcloud Password (or NEXTCLOUD_PASSWORD env)")
+	routerCmd.Flags().StringVar(&nextcloudRoomToken, "nextcloud-room-token", "", "Nextcloud Room Token (or NEXTCLOUD_ROOM_TOKEN env)")
 	routerCmd.Flags().StringVar(&whatsappPhoneID, "whatsapp-phone-id", "", "WhatsApp Phone Number ID (or WHATSAPP_PHONE_NUMBER_ID env)")
 	routerCmd.Flags().StringVar(&whatsappAccessToken, "whatsapp-access-token", "", "WhatsApp Access Token (or WHATSAPP_ACCESS_TOKEN env)")
 	routerCmd.Flags().StringVar(&whatsappVerifyToken, "whatsapp-verify-token", "", "WhatsApp Verify Token (or WHATSAPP_VERIFY_TOKEN env)")
@@ -211,6 +220,18 @@ func runRouter(cmd *cobra.Command, args []string) {
 	}
 	if dingtalkClientSecret == "" {
 		dingtalkClientSecret = os.Getenv("DINGTALK_CLIENT_SECRET")
+	}
+	if nextcloudServerURL == "" {
+		nextcloudServerURL = os.Getenv("NEXTCLOUD_SERVER_URL")
+	}
+	if nextcloudUsername == "" {
+		nextcloudUsername = os.Getenv("NEXTCLOUD_USERNAME")
+	}
+	if nextcloudPassword == "" {
+		nextcloudPassword = os.Getenv("NEXTCLOUD_PASSWORD")
+	}
+	if nextcloudRoomToken == "" {
+		nextcloudRoomToken = os.Getenv("NEXTCLOUD_ROOM_TOKEN")
 	}
 	if zaloAppID == "" {
 		zaloAppID = os.Getenv("ZALO_APP_ID")
@@ -386,6 +407,18 @@ func runRouter(cmd *cobra.Command, args []string) {
 		}
 		if dingtalkClientSecret == "" {
 			dingtalkClientSecret = savedCfg.Platforms.DingTalk.ClientSecret
+		}
+		if nextcloudServerURL == "" {
+			nextcloudServerURL = savedCfg.Platforms.Nextcloud.ServerURL
+		}
+		if nextcloudUsername == "" {
+			nextcloudUsername = savedCfg.Platforms.Nextcloud.Username
+		}
+		if nextcloudPassword == "" {
+			nextcloudPassword = savedCfg.Platforms.Nextcloud.Password
+		}
+		if nextcloudRoomToken == "" {
+			nextcloudRoomToken = savedCfg.Platforms.Nextcloud.RoomToken
 		}
 		if zaloAppID == "" {
 			zaloAppID = savedCfg.Platforms.Zalo.AppID
@@ -622,6 +655,23 @@ func runRouter(cmd *cobra.Command, args []string) {
 		r.Register(dingtalkPlatform)
 	} else {
 		logger.Info("DingTalk tokens not provided, skipping DingTalk integration")
+	}
+
+	// Register Nextcloud Talk if tokens are provided
+	if nextcloudServerURL != "" && nextcloudUsername != "" && nextcloudPassword != "" && nextcloudRoomToken != "" {
+		nextcloudPlatform, err := nextcloud.New(nextcloud.Config{
+			ServerURL: nextcloudServerURL,
+			Username:  nextcloudUsername,
+			Password:  nextcloudPassword,
+			RoomToken: nextcloudRoomToken,
+		})
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error creating Nextcloud Talk platform: %v\n", err)
+			os.Exit(1)
+		}
+		r.Register(nextcloudPlatform)
+	} else {
+		logger.Info("Nextcloud Talk tokens not provided, skipping Nextcloud Talk integration")
 	}
 
 	// Register Zalo if tokens are provided

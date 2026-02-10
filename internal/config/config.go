@@ -61,6 +61,7 @@ type PlatformConfig struct {
 	Twitch     TwitchConfig     `yaml:"twitch,omitempty"`
 	NOSTR      NOSTRConfig      `yaml:"nostr,omitempty"`
 	Zalo       ZaloConfig       `yaml:"zalo,omitempty"`
+	Nextcloud  NextcloudConfig  `yaml:"nextcloud,omitempty"`
 }
 
 type WeComConfig struct {
@@ -154,6 +155,13 @@ type ZaloConfig struct {
 	AppID       string `yaml:"app_id,omitempty"`
 	SecretKey   string `yaml:"secret_key,omitempty"`
 	AccessToken string `yaml:"access_token,omitempty"`
+}
+
+type NextcloudConfig struct {
+	ServerURL string `yaml:"server_url,omitempty"`
+	Username  string `yaml:"username,omitempty"`
+	Password  string `yaml:"password,omitempty"`
+	RoomToken string `yaml:"room_token,omitempty"`
 }
 
 type SecurityConfig struct {

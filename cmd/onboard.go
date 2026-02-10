@@ -81,6 +81,11 @@ var (
 	onboardZaloAppID       string
 	onboardZaloSecretKey   string
 	onboardZaloAccessToken string
+	// Nextcloud
+	onboardNextcloudServerURL string
+	onboardNextcloudUsername  string
+	onboardNextcloudPassword  string
+	onboardNextcloudRoomToken string
 )
 
 var onboardCmd = &cobra.Command{
@@ -171,6 +176,11 @@ func init() {
 	onboardCmd.Flags().StringVar(&onboardZaloAppID, "zalo-app-id", "", "Zalo App ID")
 	onboardCmd.Flags().StringVar(&onboardZaloSecretKey, "zalo-secret-key", "", "Zalo Secret Key")
 	onboardCmd.Flags().StringVar(&onboardZaloAccessToken, "zalo-access-token", "", "Zalo Access Token")
+	// Nextcloud
+	onboardCmd.Flags().StringVar(&onboardNextcloudServerURL, "nextcloud-server-url", "", "Nextcloud Server URL")
+	onboardCmd.Flags().StringVar(&onboardNextcloudUsername, "nextcloud-username", "", "Nextcloud Username")
+	onboardCmd.Flags().StringVar(&onboardNextcloudPassword, "nextcloud-password", "", "Nextcloud Password")
+	onboardCmd.Flags().StringVar(&onboardNextcloudRoomToken, "nextcloud-room-token", "", "Nextcloud Talk Room Token")
 }
 
 var scanner *bufio.Scanner
@@ -416,6 +426,19 @@ func applyOnboardFlags(cfg *config.Config) {
 		if onboardZaloAccessToken != "" {
 			cfg.Platforms.Zalo.AccessToken = onboardZaloAccessToken
 		}
+	case "nextcloud":
+		if onboardNextcloudServerURL != "" {
+			cfg.Platforms.Nextcloud.ServerURL = onboardNextcloudServerURL
+		}
+		if onboardNextcloudUsername != "" {
+			cfg.Platforms.Nextcloud.Username = onboardNextcloudUsername
+		}
+		if onboardNextcloudPassword != "" {
+			cfg.Platforms.Nextcloud.Password = onboardNextcloudPassword
+		}
+		if onboardNextcloudRoomToken != "" {
+			cfg.Platforms.Nextcloud.RoomToken = onboardNextcloudRoomToken
+		}
 	}
 }
 
@@ -621,6 +644,7 @@ var platformOptions = []platformInfo{
 	{"twitch", "twitch    (Twitch)"},
 	{"nostr", "nostr     (NOSTR)"},
 	{"zalo", "zalo      (Zalo)"},
+	{"nextcloud", "nextcloud (Nextcloud Talk)"},
 	{"skip", "skip      (configure later)"},
 }
 
@@ -672,6 +696,8 @@ func stepPlatform(cfg *config.Config) {
 		stepNOSTR(cfg)
 	case "zalo":
 		stepZalo(cfg)
+	case "nextcloud":
+		stepNextcloud(cfg)
 	case "skip":
 		fmt.Println("\n  > Platform configuration skipped")
 	}
@@ -802,6 +828,15 @@ func stepZalo(cfg *config.Config) {
 	cfg.Platforms.Zalo.SecretKey = promptText("Zalo Secret Key", cfg.Platforms.Zalo.SecretKey)
 	cfg.Platforms.Zalo.AccessToken = promptText("Zalo Access Token", cfg.Platforms.Zalo.AccessToken)
 	fmt.Println("\n  > Zalo configured")
+}
+
+func stepNextcloud(cfg *config.Config) {
+	fmt.Println()
+	cfg.Platforms.Nextcloud.ServerURL = promptText("Nextcloud Server URL", cfg.Platforms.Nextcloud.ServerURL)
+	cfg.Platforms.Nextcloud.Username = promptText("Nextcloud Username", cfg.Platforms.Nextcloud.Username)
+	cfg.Platforms.Nextcloud.Password = promptText("Nextcloud Password", cfg.Platforms.Nextcloud.Password)
+	cfg.Platforms.Nextcloud.RoomToken = promptText("Nextcloud Talk Room Token", cfg.Platforms.Nextcloud.RoomToken)
+	fmt.Println("\n  > Nextcloud Talk configured")
 }
 
 func stepWeChat(cfg *config.Config) {
