@@ -70,6 +70,10 @@ var (
 	// Signal
 	onboardSignalAPIURL      string
 	onboardSignalPhoneNumber string
+	// Twitch
+	onboardTwitchToken   string
+	onboardTwitchChannel string
+	onboardTwitchBotName string
 )
 
 var onboardCmd = &cobra.Command{
@@ -149,6 +153,10 @@ func init() {
 	// Signal
 	onboardCmd.Flags().StringVar(&onboardSignalAPIURL, "signal-api-url", "", "Signal API URL")
 	onboardCmd.Flags().StringVar(&onboardSignalPhoneNumber, "signal-phone-number", "", "Signal Phone Number")
+	// Twitch
+	onboardCmd.Flags().StringVar(&onboardTwitchToken, "twitch-token", "", "Twitch OAuth Token")
+	onboardCmd.Flags().StringVar(&onboardTwitchChannel, "twitch-channel", "", "Twitch Channel")
+	onboardCmd.Flags().StringVar(&onboardTwitchBotName, "twitch-bot-name", "", "Twitch Bot Name")
 }
 
 var scanner *bufio.Scanner
@@ -367,6 +375,16 @@ func applyOnboardFlags(cfg *config.Config) {
 		if onboardSignalPhoneNumber != "" {
 			cfg.Platforms.Signal.PhoneNumber = onboardSignalPhoneNumber
 		}
+	case "twitch":
+		if onboardTwitchToken != "" {
+			cfg.Platforms.Twitch.Token = onboardTwitchToken
+		}
+		if onboardTwitchChannel != "" {
+			cfg.Platforms.Twitch.Channel = onboardTwitchChannel
+		}
+		if onboardTwitchBotName != "" {
+			cfg.Platforms.Twitch.BotName = onboardTwitchBotName
+		}
 	}
 }
 
@@ -569,6 +587,7 @@ var platformOptions = []platformInfo{
 	{"mattermost", "mattermost (Mattermost)"},
 	{"imessage", "imessage  (iMessage/BlueBubbles)"},
 	{"signal", "signal    (Signal)"},
+	{"twitch", "twitch    (Twitch)"},
 	{"skip", "skip      (configure later)"},
 }
 
@@ -614,6 +633,8 @@ func stepPlatform(cfg *config.Config) {
 		stepIMessage(cfg)
 	case "signal":
 		stepSignal(cfg)
+	case "twitch":
+		stepTwitch(cfg)
 	case "skip":
 		fmt.Println("\n  > Platform configuration skipped")
 	}
@@ -721,6 +742,14 @@ func stepSignal(cfg *config.Config) {
 	cfg.Platforms.Signal.APIURL = promptText("Signal API URL (signal-cli REST)", cfg.Platforms.Signal.APIURL)
 	cfg.Platforms.Signal.PhoneNumber = promptText("Signal Phone Number", cfg.Platforms.Signal.PhoneNumber)
 	fmt.Println("\n  > Signal configured")
+}
+
+func stepTwitch(cfg *config.Config) {
+	fmt.Println()
+	cfg.Platforms.Twitch.Token = promptText("Twitch OAuth Token", cfg.Platforms.Twitch.Token)
+	cfg.Platforms.Twitch.Channel = promptText("Twitch Channel", cfg.Platforms.Twitch.Channel)
+	cfg.Platforms.Twitch.BotName = promptText("Twitch Bot Name", cfg.Platforms.Twitch.BotName)
+	fmt.Println("\n  > Twitch configured")
 }
 
 func stepWeChat(cfg *config.Config) {

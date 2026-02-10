@@ -23,6 +23,7 @@ import (
 	"github.com/pltanton/lingti-bot/internal/platforms/line"
 	"github.com/pltanton/lingti-bot/internal/platforms/mattermost"
 	signalplatform "github.com/pltanton/lingti-bot/internal/platforms/signal"
+	"github.com/pltanton/lingti-bot/internal/platforms/twitch"
 	"github.com/pltanton/lingti-bot/internal/platforms/matrix"
 	"github.com/pltanton/lingti-bot/internal/platforms/teams"
 	"github.com/pltanton/lingti-bot/internal/platforms/whatsapp"
@@ -63,6 +64,9 @@ var (
 	blueBubblesPassword  string
 	signalAPIURL         string
 	signalPhoneNumber    string
+	twitchToken          string
+	twitchChannel        string
+	twitchBotName        string
 	whatsappPhoneID      string
 	whatsappAccessToken  string
 	whatsappVerifyToken  string
@@ -135,6 +139,9 @@ func init() {
 	routerCmd.Flags().StringVar(&blueBubblesPassword, "bluebubbles-password", "", "BlueBubbles Password (or BLUEBUBBLES_PASSWORD env)")
 	routerCmd.Flags().StringVar(&signalAPIURL, "signal-api-url", "", "Signal API URL (or SIGNAL_API_URL env)")
 	routerCmd.Flags().StringVar(&signalPhoneNumber, "signal-phone-number", "", "Signal Phone Number (or SIGNAL_PHONE_NUMBER env)")
+	routerCmd.Flags().StringVar(&twitchToken, "twitch-token", "", "Twitch OAuth Token (or TWITCH_TOKEN env)")
+	routerCmd.Flags().StringVar(&twitchChannel, "twitch-channel", "", "Twitch Channel (or TWITCH_CHANNEL env)")
+	routerCmd.Flags().StringVar(&twitchBotName, "twitch-bot-name", "", "Twitch Bot Name (or TWITCH_BOT_NAME env)")
 	routerCmd.Flags().StringVar(&whatsappPhoneID, "whatsapp-phone-id", "", "WhatsApp Phone Number ID (or WHATSAPP_PHONE_NUMBER_ID env)")
 	routerCmd.Flags().StringVar(&whatsappAccessToken, "whatsapp-access-token", "", "WhatsApp Access Token (or WHATSAPP_ACCESS_TOKEN env)")
 	routerCmd.Flags().StringVar(&whatsappVerifyToken, "whatsapp-verify-token", "", "WhatsApp Verify Token (or WHATSAPP_VERIFY_TOKEN env)")
@@ -192,6 +199,15 @@ func runRouter(cmd *cobra.Command, args []string) {
 	}
 	if dingtalkClientSecret == "" {
 		dingtalkClientSecret = os.Getenv("DINGTALK_CLIENT_SECRET")
+	}
+	if twitchToken == "" {
+		twitchToken = os.Getenv("TWITCH_TOKEN")
+	}
+	if twitchChannel == "" {
+		twitchChannel = os.Getenv("TWITCH_CHANNEL")
+	}
+	if twitchBotName == "" {
+		twitchBotName = os.Getenv("TWITCH_BOT_NAME")
 	}
 	if signalAPIURL == "" {
 		signalAPIURL = os.Getenv("SIGNAL_API_URL")
@@ -343,6 +359,15 @@ func runRouter(cmd *cobra.Command, args []string) {
 		}
 		if dingtalkClientSecret == "" {
 			dingtalkClientSecret = savedCfg.Platforms.DingTalk.ClientSecret
+		}
+		if twitchToken == "" {
+			twitchToken = savedCfg.Platforms.Twitch.Token
+		}
+		if twitchChannel == "" {
+			twitchChannel = savedCfg.Platforms.Twitch.Channel
+		}
+		if twitchBotName == "" {
+			twitchBotName = savedCfg.Platforms.Twitch.BotName
 		}
 		if signalAPIURL == "" {
 			signalAPIURL = savedCfg.Platforms.Signal.APIURL
@@ -555,6 +580,22 @@ func runRouter(cmd *cobra.Command, args []string) {
 		r.Register(dingtalkPlatform)
 	} else {
 		logger.Info("DingTalk tokens not provided, skipping DingTalk integration")
+	}
+
+	// Register Twitch if tokens are provided
+	if twitchToken != "" && twitchChannel != "" && twitchBotName != "" {
+		twitchPlatform, err := twitch.New(twitch.Config{
+			Token:   twitchToken,
+			Channel: twitchChannel,
+			BotName: twitchBotName,
+		})
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error creating Twitch platform: %v\n", err)
+			os.Exit(1)
+		}
+		r.Register(twitchPlatform)
+	} else {
+		logger.Info("Twitch tokens not provided, skipping Twitch integration")
 	}
 
 	// Register Signal if tokens are provided

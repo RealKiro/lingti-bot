@@ -58,6 +58,7 @@ type PlatformConfig struct {
 	Mattermost MattermostConfig `yaml:"mattermost,omitempty"`
 	IMessage   IMessageConfig   `yaml:"imessage,omitempty"`
 	Signal     SignalConfig     `yaml:"signal,omitempty"`
+	Twitch     TwitchConfig     `yaml:"twitch,omitempty"`
 }
 
 type WeComConfig struct {
@@ -134,6 +135,12 @@ type IMessageConfig struct {
 type SignalConfig struct {
 	APIURL      string `yaml:"api_url,omitempty"`
 	PhoneNumber string `yaml:"phone_number,omitempty"`
+}
+
+type TwitchConfig struct {
+	Token   string `yaml:"token,omitempty"`
+	Channel string `yaml:"channel,omitempty"`
+	BotName string `yaml:"bot_name,omitempty"`
 }
 
 type SecurityConfig struct {
