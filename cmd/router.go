@@ -22,6 +22,7 @@ import (
 	"github.com/pltanton/lingti-bot/internal/platforms/wecom"
 	"github.com/pltanton/lingti-bot/internal/platforms/line"
 	"github.com/pltanton/lingti-bot/internal/platforms/mattermost"
+	signalplatform "github.com/pltanton/lingti-bot/internal/platforms/signal"
 	"github.com/pltanton/lingti-bot/internal/platforms/matrix"
 	"github.com/pltanton/lingti-bot/internal/platforms/teams"
 	"github.com/pltanton/lingti-bot/internal/platforms/whatsapp"
@@ -60,6 +61,8 @@ var (
 	mattermostTeamName   string
 	blueBubblesURL       string
 	blueBubblesPassword  string
+	signalAPIURL         string
+	signalPhoneNumber    string
 	whatsappPhoneID      string
 	whatsappAccessToken  string
 	whatsappVerifyToken  string
@@ -130,6 +133,8 @@ func init() {
 	routerCmd.Flags().StringVar(&mattermostTeamName, "mattermost-team-name", "", "Mattermost Team Name (or MATTERMOST_TEAM_NAME env)")
 	routerCmd.Flags().StringVar(&blueBubblesURL, "bluebubbles-url", "", "BlueBubbles Server URL (or BLUEBUBBLES_URL env)")
 	routerCmd.Flags().StringVar(&blueBubblesPassword, "bluebubbles-password", "", "BlueBubbles Password (or BLUEBUBBLES_PASSWORD env)")
+	routerCmd.Flags().StringVar(&signalAPIURL, "signal-api-url", "", "Signal API URL (or SIGNAL_API_URL env)")
+	routerCmd.Flags().StringVar(&signalPhoneNumber, "signal-phone-number", "", "Signal Phone Number (or SIGNAL_PHONE_NUMBER env)")
 	routerCmd.Flags().StringVar(&whatsappPhoneID, "whatsapp-phone-id", "", "WhatsApp Phone Number ID (or WHATSAPP_PHONE_NUMBER_ID env)")
 	routerCmd.Flags().StringVar(&whatsappAccessToken, "whatsapp-access-token", "", "WhatsApp Access Token (or WHATSAPP_ACCESS_TOKEN env)")
 	routerCmd.Flags().StringVar(&whatsappVerifyToken, "whatsapp-verify-token", "", "WhatsApp Verify Token (or WHATSAPP_VERIFY_TOKEN env)")
@@ -187,6 +192,12 @@ func runRouter(cmd *cobra.Command, args []string) {
 	}
 	if dingtalkClientSecret == "" {
 		dingtalkClientSecret = os.Getenv("DINGTALK_CLIENT_SECRET")
+	}
+	if signalAPIURL == "" {
+		signalAPIURL = os.Getenv("SIGNAL_API_URL")
+	}
+	if signalPhoneNumber == "" {
+		signalPhoneNumber = os.Getenv("SIGNAL_PHONE_NUMBER")
 	}
 	if blueBubblesURL == "" {
 		blueBubblesURL = os.Getenv("BLUEBUBBLES_URL")
@@ -332,6 +343,12 @@ func runRouter(cmd *cobra.Command, args []string) {
 		}
 		if dingtalkClientSecret == "" {
 			dingtalkClientSecret = savedCfg.Platforms.DingTalk.ClientSecret
+		}
+		if signalAPIURL == "" {
+			signalAPIURL = savedCfg.Platforms.Signal.APIURL
+		}
+		if signalPhoneNumber == "" {
+			signalPhoneNumber = savedCfg.Platforms.Signal.PhoneNumber
 		}
 		if blueBubblesURL == "" {
 			blueBubblesURL = savedCfg.Platforms.IMessage.BlueBubblesURL
@@ -538,6 +555,21 @@ func runRouter(cmd *cobra.Command, args []string) {
 		r.Register(dingtalkPlatform)
 	} else {
 		logger.Info("DingTalk tokens not provided, skipping DingTalk integration")
+	}
+
+	// Register Signal if tokens are provided
+	if signalAPIURL != "" && signalPhoneNumber != "" {
+		signalPlatform, err := signalplatform.New(signalplatform.Config{
+			APIURL:      signalAPIURL,
+			PhoneNumber: signalPhoneNumber,
+		})
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error creating Signal platform: %v\n", err)
+			os.Exit(1)
+		}
+		r.Register(signalPlatform)
+	} else {
+		logger.Info("Signal tokens not provided, skipping Signal integration")
 	}
 
 	// Register iMessage if tokens are provided

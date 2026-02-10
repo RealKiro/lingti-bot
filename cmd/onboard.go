@@ -67,6 +67,9 @@ var (
 	// iMessage
 	onboardBlueBubblesURL      string
 	onboardBlueBubblesPassword string
+	// Signal
+	onboardSignalAPIURL      string
+	onboardSignalPhoneNumber string
 )
 
 var onboardCmd = &cobra.Command{
@@ -143,6 +146,9 @@ func init() {
 	// iMessage
 	onboardCmd.Flags().StringVar(&onboardBlueBubblesURL, "bluebubbles-url", "", "BlueBubbles Server URL")
 	onboardCmd.Flags().StringVar(&onboardBlueBubblesPassword, "bluebubbles-password", "", "BlueBubbles Password")
+	// Signal
+	onboardCmd.Flags().StringVar(&onboardSignalAPIURL, "signal-api-url", "", "Signal API URL")
+	onboardCmd.Flags().StringVar(&onboardSignalPhoneNumber, "signal-phone-number", "", "Signal Phone Number")
 }
 
 var scanner *bufio.Scanner
@@ -354,6 +360,13 @@ func applyOnboardFlags(cfg *config.Config) {
 		if onboardBlueBubblesPassword != "" {
 			cfg.Platforms.IMessage.BlueBubblesPassword = onboardBlueBubblesPassword
 		}
+	case "signal":
+		if onboardSignalAPIURL != "" {
+			cfg.Platforms.Signal.APIURL = onboardSignalAPIURL
+		}
+		if onboardSignalPhoneNumber != "" {
+			cfg.Platforms.Signal.PhoneNumber = onboardSignalPhoneNumber
+		}
 	}
 }
 
@@ -555,6 +568,7 @@ var platformOptions = []platformInfo{
 	{"googlechat", "googlechat (Google Chat)"},
 	{"mattermost", "mattermost (Mattermost)"},
 	{"imessage", "imessage  (iMessage/BlueBubbles)"},
+	{"signal", "signal    (Signal)"},
 	{"skip", "skip      (configure later)"},
 }
 
@@ -598,6 +612,8 @@ func stepPlatform(cfg *config.Config) {
 		stepMattermost(cfg)
 	case "imessage":
 		stepIMessage(cfg)
+	case "signal":
+		stepSignal(cfg)
 	case "skip":
 		fmt.Println("\n  > Platform configuration skipped")
 	}
@@ -698,6 +714,13 @@ func stepIMessage(cfg *config.Config) {
 	cfg.Platforms.IMessage.BlueBubblesURL = promptText("BlueBubbles Server URL", cfg.Platforms.IMessage.BlueBubblesURL)
 	cfg.Platforms.IMessage.BlueBubblesPassword = promptText("BlueBubbles Password", cfg.Platforms.IMessage.BlueBubblesPassword)
 	fmt.Println("\n  > iMessage configured")
+}
+
+func stepSignal(cfg *config.Config) {
+	fmt.Println()
+	cfg.Platforms.Signal.APIURL = promptText("Signal API URL (signal-cli REST)", cfg.Platforms.Signal.APIURL)
+	cfg.Platforms.Signal.PhoneNumber = promptText("Signal Phone Number", cfg.Platforms.Signal.PhoneNumber)
+	fmt.Println("\n  > Signal configured")
 }
 
 func stepWeChat(cfg *config.Config) {
