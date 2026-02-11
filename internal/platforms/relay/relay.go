@@ -3,6 +3,7 @@ package relay
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
@@ -111,11 +112,19 @@ type IncomingMessage struct {
 
 // OutgoingResponse is sent via webhook
 type OutgoingResponse struct {
-	Type      string `json:"type"`
-	MessageID string `json:"message_id"`
-	Platform  string `json:"platform"`
-	ChannelID string `json:"channel_id"`
-	Text      string `json:"text"`
+	Type      string          `json:"type"`
+	MessageID string          `json:"message_id"`
+	Platform  string          `json:"platform"`
+	ChannelID string          `json:"channel_id"`
+	Text      string          `json:"text"`
+	Files     []OutgoingFile  `json:"files,omitempty"`
+}
+
+// OutgoingFile is a file attachment sent via webhook (base64-encoded)
+type OutgoingFile struct {
+	Name      string `json:"name"`       // filename
+	MediaType string `json:"media_type"` // "image", "voice", "video", "file"
+	Data      string `json:"data"`       // base64-encoded file content
 }
 
 // ErrorMessage is an error notification from the server
@@ -272,24 +281,8 @@ func (p *Platform) Send(ctx context.Context, channelID string, resp router.Respo
 			// For unsupported file types, read content and send as text.
 			wxMediaType := wechatMediaType(file.Path, mediaType)
 			if wxMediaType == "" {
-				// Unsupported type — send file content as text message
-				log.Printf("[Relay] WeChat OA: unsupported file type, sending content as text: %s", file.Path)
-				content, err := os.ReadFile(file.Path)
-				if err != nil {
-					return fmt.Errorf("failed to read file %s: %w", file.Path, err)
-				}
-				runes := []rune(string(content))
-				const maxRunes = 500
-				body := string(content)
-				if len(runes) > maxRunes {
-					body = string(runes[:maxRunes]) + "\n\n... (内容过长，已截断)"
-				}
-				text := fmt.Sprintf("📎 %s\n\n%s", filepath.Base(file.Path), body)
-				if err := p.sendWebhook(ctx, channelID, router.Response{
-					Text:     text,
-					Metadata: resp.Metadata,
-				}); err != nil {
-					return fmt.Errorf("failed to send file content as text: %w", err)
+				if err := p.sendFileAsText(ctx, channelID, file.Path, resp.Metadata); err != nil {
+					return err
 				}
 				continue
 			}
@@ -333,6 +326,22 @@ func (p *Platform) Send(ctx context.Context, channelID string, resp router.Respo
 			log.Printf("[Relay] File sent successfully: %s -> %s", file.Path, channelID)
 
 		default:
+			// No local media API — send file via webhook for server-side handling
+			if p.config.Platform == "wechat" {
+				wxMediaType := wechatMediaType(file.Path, mediaType)
+				if wxMediaType == "" {
+					// Text-based files: send content preview via passive reply
+					if err := p.sendFileAsText(ctx, channelID, file.Path, resp.Metadata); err != nil {
+						return err
+					}
+					continue
+				}
+				// Media files: send base64-encoded via webhook for server to upload+send
+				if err := p.sendFileViaWebhook(ctx, channelID, file.Path, wxMediaType, resp.Metadata); err != nil {
+					return err
+				}
+				continue
+			}
 			log.Printf("[Relay] Cannot send file: no media API initialized")
 			return fmt.Errorf("media API not available for file sending")
 		}
@@ -375,6 +384,81 @@ func (p *Platform) sendWebhook(ctx context.Context, channelID string, resp route
 		return fmt.Errorf("webhook returned status %d", httpResp.StatusCode)
 	}
 
+	return nil
+}
+
+// sendFileAsText reads a file and sends its content as a truncated text message via webhook (passive reply).
+func (p *Platform) sendFileAsText(ctx context.Context, channelID, filePath string, metadata map[string]string) error {
+	log.Printf("[Relay] Sending file as text preview (passive): %s", filePath)
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to read file %s: %w", filePath, err)
+	}
+	runes := []rune(string(content))
+	const maxRunes = 500
+	body := string(content)
+	if len(runes) > maxRunes {
+		body = string(runes[:maxRunes]) + "\n\n... (内容过长，已截断)"
+	}
+	text := fmt.Sprintf("📎 %s\n\n%s", filepath.Base(filePath), body)
+	if err := p.sendWebhook(ctx, channelID, router.Response{
+		Text:     text,
+		Metadata: metadata,
+	}); err != nil {
+		return fmt.Errorf("failed to send file content as text: %w", err)
+	}
+	return nil
+}
+
+// sendFileViaWebhook sends a file as base64-encoded data via webhook for server-side upload+send.
+func (p *Platform) sendFileViaWebhook(ctx context.Context, channelID, filePath, mediaType string, metadata map[string]string) error {
+	log.Printf("[Relay] Sending file via webhook (server-side): %s (type=%s)", filePath, mediaType)
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to read file %s: %w", filePath, err)
+	}
+
+	outgoing := OutgoingResponse{
+		Type:      "response",
+		Platform:  p.config.Platform,
+		ChannelID: channelID,
+		Files: []OutgoingFile{
+			{
+				Name:      filepath.Base(filePath),
+				MediaType: mediaType,
+				Data:      base64.StdEncoding.EncodeToString(content),
+			},
+		},
+	}
+	if metadata != nil {
+		outgoing.MessageID = metadata["message_id"]
+	}
+
+	body, err := json.Marshal(outgoing)
+	if err != nil {
+		return fmt.Errorf("failed to marshal file response: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, p.config.WebhookURL, bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Session-ID", p.sessionID)
+	req.Header.Set("X-User-ID", p.config.UserID)
+
+	httpResp, err := p.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to send file webhook: %w", err)
+	}
+	defer httpResp.Body.Close()
+
+	if httpResp.StatusCode >= 400 {
+		return fmt.Errorf("file webhook returned status %d", httpResp.StatusCode)
+	}
+
+	log.Printf("[Relay] File sent via webhook successfully: %s -> %s", filePath, channelID)
 	return nil
 }
 

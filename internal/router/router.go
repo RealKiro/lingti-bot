@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/pltanton/lingti-bot/internal/logger"
 )
@@ -85,7 +86,8 @@ func (r *Router) Register(platform Platform) {
 
 // handleMessage processes an incoming message
 func (r *Router) handleMessage(msg Message) {
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
 
 	logger.Info("[Router] Message from %s/%s: %s", msg.Platform, msg.Username, msg.Text)
 
