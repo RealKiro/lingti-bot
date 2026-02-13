@@ -12,6 +12,7 @@ import (
 	"github.com/go-rod/rod/lib/proto"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/pltanton/lingti-bot/internal/browser"
+	"github.com/pltanton/lingti-bot/internal/logger"
 )
 
 // BrowserStart launches a browser instance or connects to an existing Chrome.
@@ -34,7 +35,9 @@ func BrowserStart(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResu
 	}
 
 	b := browser.Instance()
+	logger.Debug("[browser_start] headless=%v url=%q cdp_url=%q executable=%q", opts.Headless, opts.URL, opts.ConnectURL, opts.ExecutablePath)
 	if err := b.Start(opts); err != nil {
+		logger.Debug("[browser_start] failed: %v", err)
 		return mcp.NewToolResultError(fmt.Sprintf("failed to start browser: %v", err)), nil
 	}
 
@@ -51,6 +54,7 @@ func BrowserStart(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResu
 	if opts.URL != "" {
 		msg += fmt.Sprintf(", navigated to %s", opts.URL)
 	}
+	logger.Debug("[browser_start] %s", msg)
 	return mcp.NewToolResultText(msg), nil
 }
 
@@ -58,12 +62,16 @@ func BrowserStart(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResu
 func BrowserStop(_ context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	b := browser.Instance()
 	wasConnected := b.IsConnected()
+	logger.Debug("[browser_stop] connected=%v", wasConnected)
 	if err := b.Stop(); err != nil {
+		logger.Debug("[browser_stop] failed: %v", err)
 		return mcp.NewToolResultError(fmt.Sprintf("failed to stop browser: %v", err)), nil
 	}
 	if wasConnected {
+		logger.Debug("[browser_stop] disconnected (Chrome still running)")
 		return mcp.NewToolResultText("Disconnected from browser (Chrome is still running)"), nil
 	}
+	logger.Debug("[browser_stop] stopped")
 	return mcp.NewToolResultText("Browser stopped"), nil
 }
 
@@ -81,48 +89,62 @@ func BrowserNavigate(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolR
 		return mcp.NewToolResultError("url is required"), nil
 	}
 
+	logger.Debug("[browser_navigate] url=%q", url)
 	b := browser.Instance()
 	if err := b.EnsureRunning(); err != nil {
+		logger.Debug("[browser_navigate] EnsureRunning failed: %v", err)
 		return mcp.NewToolResultError(fmt.Sprintf("failed to start browser: %v", err)), nil
 	}
 
 	page, err := b.ActivePage()
 	if err != nil {
+		logger.Debug("[browser_navigate] ActivePage failed: %v", err)
 		return mcp.NewToolResultError(fmt.Sprintf("failed to get page: %v", err)), nil
 	}
 
+	logger.Debug("[browser_navigate] navigating...")
 	if err := page.Navigate(url); err != nil {
+		logger.Debug("[browser_navigate] Navigate failed: %v", err)
 		return mcp.NewToolResultError(fmt.Sprintf("failed to navigate: %v", err)), nil
 	}
 
+	logger.Debug("[browser_navigate] waiting for page load...")
 	if err := page.WaitLoad(); err != nil {
+		logger.Debug("[browser_navigate] WaitLoad failed: %v", err)
 		return mcp.NewToolResultError(fmt.Sprintf("page load error: %v", err)), nil
 	}
 
 	info, err := page.Info()
 	if err != nil {
+		logger.Debug("[browser_navigate] done (no page info)")
 		return mcp.NewToolResultText(fmt.Sprintf("Navigated to %s", url)), nil
 	}
+	logger.Debug("[browser_navigate] done: title=%q url=%q", info.Title, info.URL)
 	return mcp.NewToolResultText(fmt.Sprintf("Navigated to %s (title: %s)", info.URL, info.Title)), nil
 }
 
 // BrowserSnapshot captures the accessibility tree with numbered refs.
 func BrowserSnapshot(_ context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	logger.Debug("[browser_snapshot] capturing accessibility tree...")
 	b := browser.Instance()
 	if err := b.EnsureRunning(); err != nil {
+		logger.Debug("[browser_snapshot] EnsureRunning failed: %v", err)
 		return mcp.NewToolResultError(fmt.Sprintf("failed to start browser: %v", err)), nil
 	}
 
 	page, err := b.ActivePage()
 	if err != nil {
+		logger.Debug("[browser_snapshot] ActivePage failed: %v", err)
 		return mcp.NewToolResultError(fmt.Sprintf("failed to get page: %v", err)), nil
 	}
 
 	snapshot, refs, err := browser.Snapshot(page)
 	if err != nil {
+		logger.Debug("[browser_snapshot] Snapshot failed: %v", err)
 		return mcp.NewToolResultError(fmt.Sprintf("failed to capture snapshot: %v", err)), nil
 	}
 
+	logger.Debug("[browser_snapshot] captured %d refs", len(refs))
 	b.SetRefs(refs)
 
 	info, _ := page.Info()
@@ -153,6 +175,7 @@ func BrowserSnapshot(_ context.Context, _ mcp.CallToolRequest) (*mcp.CallToolRes
 
 // BrowserScreenshot captures a screenshot of the current page.
 func BrowserScreenshot(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	logger.Debug("[browser_screenshot] capturing...")
 	b := browser.Instance()
 	if err := b.EnsureRunning(); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("failed to start browser: %v", err)), nil
@@ -207,9 +230,11 @@ func BrowserScreenshot(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToo
 	}
 
 	if err := os.WriteFile(absPath, imgData, 0644); err != nil {
+		logger.Debug("[browser_screenshot] failed to write: %v", err)
 		return mcp.NewToolResultError(fmt.Sprintf("failed to save screenshot: %v", err)), nil
 	}
 
+	logger.Debug("[browser_screenshot] saved to %s (%d bytes)", absPath, len(imgData))
 	return mcp.NewToolResultText(fmt.Sprintf("Screenshot saved to: %s", absPath)), nil
 }
 
@@ -220,31 +245,38 @@ func BrowserClick(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResu
 		return mcp.NewToolResultError("ref is required (number)"), nil
 	}
 
+	logger.Debug("[browser_click] ref=%d", int(ref))
 	b := browser.Instance()
 	page, err := b.ActivePage()
 	if err != nil {
+		logger.Debug("[browser_click] ActivePage failed: %v", err)
 		return mcp.NewToolResultError(fmt.Sprintf("failed to get page: %v", err)), nil
 	}
 
 	// Try to click the element
 	if err := browser.Click(page, b, int(ref)); err != nil {
+		logger.Debug("[browser_click] Click failed: %v", err)
 		// Check if this is a "ref not found" error - might need fresh snapshot
 		errStr := err.Error()
 		if containsString(errStr, "ref") && containsString(errStr, "not found") {
+			logger.Debug("[browser_click] ref not found, auto-refreshing snapshot...")
 			// Try automatic retry with fresh snapshot
 			_, newRefs, snapErr := browser.Snapshot(page)
 			if snapErr == nil {
 				b.SetRefs(newRefs)
+				logger.Debug("[browser_click] retrying click with %d new refs", len(newRefs))
 
 				// Retry the click with updated refs
 				if retryErr := browser.Click(page, b, int(ref)); retryErr == nil {
 					entry, _ := b.GetRef(int(ref))
+					logger.Debug("[browser_click] retry succeeded: [%d] %s %q", int(ref), entry.Role, entry.Name)
 					return mcp.NewToolResultText(fmt.Sprintf("Clicked [%d] %s %q (after auto-refresh)", int(ref), entry.Role, entry.Name)), nil
 				}
 			}
 		}
 
 		// If retry failed or not applicable, capture fresh snapshot for AI to see current state
+		logger.Debug("[browser_click] capturing snapshot for error context")
 		snapshot, newRefs, snapErr := browser.Snapshot(page)
 		if snapErr == nil {
 			b.SetRefs(newRefs)
@@ -258,6 +290,7 @@ func BrowserClick(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResu
 	}
 
 	entry, _ := b.GetRef(int(ref))
+	logger.Debug("[browser_click] clicked [%d] %s %q", int(ref), entry.Role, entry.Name)
 	return mcp.NewToolResultText(fmt.Sprintf("Clicked [%d] %s %q", int(ref), entry.Role, entry.Name)), nil
 }
 
@@ -277,21 +310,26 @@ func BrowserType(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResul
 		submit = s
 	}
 
+	logger.Debug("[browser_type] ref=%d text=%q submit=%v", int(ref), text, submit)
 	b := browser.Instance()
 	page, err := b.ActivePage()
 	if err != nil {
+		logger.Debug("[browser_type] ActivePage failed: %v", err)
 		return mcp.NewToolResultError(fmt.Sprintf("failed to get page: %v", err)), nil
 	}
 
 	// Try to type into the element
 	if err := browser.Type(page, b, int(ref), text, submit); err != nil {
+		logger.Debug("[browser_type] Type failed: %v", err)
 		// Check if this is a "ref not found" error - might need fresh snapshot
 		errStr := err.Error()
 		if containsString(errStr, "ref") && containsString(errStr, "not found") {
+			logger.Debug("[browser_type] ref not found, auto-refreshing snapshot...")
 			// Try automatic retry with fresh snapshot
 			_, newRefs, snapErr := browser.Snapshot(page)
 			if snapErr == nil {
 				b.SetRefs(newRefs)
+				logger.Debug("[browser_type] retrying with %d new refs", len(newRefs))
 
 				// Retry the type with updated refs
 				if retryErr := browser.Type(page, b, int(ref), text, submit); retryErr == nil {
@@ -299,12 +337,14 @@ func BrowserType(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResul
 					if submit {
 						msg += " and pressed Enter"
 					}
+					logger.Debug("[browser_type] retry succeeded")
 					return mcp.NewToolResultText(msg), nil
 				}
 			}
 		}
 
 		// If retry failed or not applicable, capture fresh snapshot for AI to see current state
+		logger.Debug("[browser_type] capturing snapshot for error context")
 		snapshot, newRefs, snapErr := browser.Snapshot(page)
 		if snapErr == nil {
 			b.SetRefs(newRefs)
@@ -321,6 +361,7 @@ func BrowserType(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResul
 	if submit {
 		msg += " and pressed Enter"
 	}
+	logger.Debug("[browser_type] %s", msg)
 	return mcp.NewToolResultText(msg), nil
 }
 
@@ -337,10 +378,13 @@ func BrowserPress(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResu
 		return mcp.NewToolResultError(fmt.Sprintf("failed to get page: %v", err)), nil
 	}
 
+	logger.Debug("[browser_press] key=%q", key)
 	if err := browser.Press(page, key); err != nil {
+		logger.Debug("[browser_press] failed: %v", err)
 		return mcp.NewToolResultError(fmt.Sprintf("failed to press key: %v", err)), nil
 	}
 
+	logger.Debug("[browser_press] pressed %s", key)
 	return mcp.NewToolResultText(fmt.Sprintf("Pressed %s", key)), nil
 }
 
@@ -361,11 +405,14 @@ func BrowserExecuteJS(_ context.Context, req mcp.CallToolRequest) (*mcp.CallTool
 		return mcp.NewToolResultError(fmt.Sprintf("failed to get page: %v", err)), nil
 	}
 
+	logger.Debug("[browser_execute_js] script=%q", script)
 	result, err := browser.ExecuteJS(page, script)
 	if err != nil {
+		logger.Debug("[browser_execute_js] failed: %v", err)
 		return mcp.NewToolResultError(fmt.Sprintf("JS error: %v", err)), nil
 	}
 
+	logger.Debug("[browser_execute_js] done, result length=%d", len(result))
 	return mcp.NewToolResultText(result), nil
 }
 
@@ -387,11 +434,14 @@ func BrowserClickAll(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolR
 		return mcp.NewToolResultError(fmt.Sprintf("failed to get page: %v", err)), nil
 	}
 
+	logger.Debug("[browser_click_all] selector=%q delay=%v", selector, delay)
 	count, err := browser.ClickAll(page, selector, delay)
 	if err != nil {
+		logger.Debug("[browser_click_all] failed: %v", err)
 		return mcp.NewToolResultError(fmt.Sprintf("failed to click elements: %v", err)), nil
 	}
 
+	logger.Debug("[browser_click_all] clicked %d elements", count)
 	return mcp.NewToolResultText(fmt.Sprintf("Clicked %d elements matching %q", count, selector)), nil
 }
 
