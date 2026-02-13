@@ -466,6 +466,13 @@ Always simulate real user behavior: navigate to the base URL first, then use the
 - document.querySelector('.dialog-close-btn').click()
 Then re-snapshot and continue.
 
+**Batch actions (like/follow/favorite):** Use browser_click_all with CSS selectors. For Chinese sites (小红书/抖音/微博), try these selectors DIRECTLY without inspecting first:
+- 点赞 (like) → browser_click_all with selector ".like-wrapper"
+- 收藏 (favorite) → browser_click_all with selector "[class*='collect']"
+- 关注 (follow) → browser_click_all with selector "[class*='follow']"
+If click count is 0, inspect with: return Array.from(document.querySelectorAll('span,button')).filter(e=>e.children.length<5).slice(0,10).map(e=>e.className+' | '+e.textContent.trim().slice(0,15)).join('\n')
+Do NOT waste rounds — try clicking first, inspect only if it fails.
+
 ## Important Rules
 1. **ALWAYS use tools** - Never tell users to do things manually
 2. **Be action-oriented** - Execute tasks, don't just describe them
@@ -493,7 +500,7 @@ Current date: %s%s%s`, autoApprovalNotice, runtime.GOOS, runtime.GOARCH, homeDir
 	}
 
 	// Handle tool use if needed
-	const maxToolRounds = 10
+	const maxToolRounds = 20
 	var pendingFiles []router.FileAttachment
 	toolCallCounts := map[string]int{} // track per-tool call counts
 	for round := range maxToolRounds {
@@ -1115,7 +1122,7 @@ func (a *Agent) buildToolsList() []Tool {
 		},
 		{
 			Name:        "browser_click_all",
-			Description: "Click ALL elements matching a CSS selector (e.g. '.like-btn', '#follow'). Uses real mouse clicks with configurable delay between each. Useful for batch-liking, batch-following, etc.",
+			Description: "Click ALL elements matching a CSS selector. Uses real mouse clicks with configurable delay. Inspect DOM first with browser_execute_js to find the right selector. Common: 点赞→.like-wrapper, 收藏→[class*='collect'], 关注→[class*='follow'].",
 			InputSchema: jsonSchema(map[string]any{
 				"type": "object",
 				"properties": map[string]any{

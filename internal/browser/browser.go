@@ -259,8 +259,12 @@ type StatusInfo struct {
 }
 
 // ExecuteJS runs JavaScript on the active page and returns the result as a string.
+// The script is wrapped in an arrow function so that rod's .apply() works correctly
+// even when the script contains statements like forEach() that return undefined.
+// Use "return <expr>" to get a value back.
 func ExecuteJS(page *rod.Page, script string) (string, error) {
-	result, err := page.Eval(script)
+	wrapped := fmt.Sprintf("() => { %s }", script)
+	result, err := page.Eval(wrapped)
 	if err != nil {
 		return "", fmt.Errorf("JS execution failed: %w", err)
 	}

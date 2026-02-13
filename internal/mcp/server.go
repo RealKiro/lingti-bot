@@ -393,8 +393,8 @@ func registerBrowserTools(s *Server) {
 
 	// browser_execute_js
 	s.addTool(mcp.NewTool("browser_execute_js",
-		mcp.WithDescription("Execute JavaScript on the current page. Use to dismiss modals/overlays, extract data, or interact with elements that can't be reached via refs."),
-		mcp.WithString("script", mcp.Required(), mcp.Description("JavaScript code to execute (runs in page context)")),
+		mcp.WithDescription("Execute JavaScript on the current page. The script runs as a function body — use 'return expr' to get a value back. Statements like forEach/for loops work without return."),
+		mcp.WithString("script", mcp.Required(), mcp.Description("JavaScript code to execute as function body (use 'return' to get values back)")),
 	), tools.BrowserExecuteJS)
 
 	// browser_tabs
