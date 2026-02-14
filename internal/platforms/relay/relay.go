@@ -69,6 +69,9 @@ type Platform struct {
 	wecomPlatform *wecom.Platform
 	// WeChat OA client for media upload/send (when platform=wechat)
 	wechatClient *wechat.Client
+	// KF sync cursor per open_kfid
+	kfCursors   map[string]string
+	kfCursorsMu sync.Mutex
 }
 
 // Protocol message types
@@ -172,6 +175,7 @@ func New(cfg Config) (*Platform, error) {
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
 		},
+		kfCursors: make(map[string]string),
 	}
 
 	// Initialize MsgCrypt for WeCom platform (for local decryption)
@@ -199,6 +203,9 @@ func New(cfg Config) (*Platform, error) {
 		} else {
 			p.wecomPlatform = wp
 			log.Printf("[Relay] WeCom media API enabled")
+
+			// Initialize KF cursors to skip historical messages
+			go p.initKfCursors()
 		}
 	}
 
@@ -261,6 +268,16 @@ func (p *Platform) Stop() error {
 
 // Send sends a response via webhook (text) and direct WeCom API (files)
 func (p *Platform) Send(ctx context.Context, channelID string, resp router.Response) error {
+	// Handle KF (customer service) messages directly via WeCom API
+	if resp.Metadata != nil && resp.Metadata["kf"] == "true" && p.wecomPlatform != nil {
+		if resp.Text != "" {
+			if err := p.wecomPlatform.SendKfMessage(resp.Metadata["external_userid"], resp.Metadata["open_kfid"], resp.Text); err != nil {
+				return fmt.Errorf("failed to send kf message: %w", err)
+			}
+		}
+		return nil
+	}
+
 	// Send text via webhook
 	if resp.Text != "" {
 		if err := p.sendWebhook(ctx, channelID, resp); err != nil {
@@ -722,9 +739,14 @@ func (p *Platform) handleRawWeComMessage(data []byte) {
 		return
 	}
 
-	// Skip event messages
+	// Handle event messages
 	if receivedMsg.MsgType == "event" {
-		log.Printf("[Relay] Ignoring event: %s", receivedMsg.Event)
+		if receivedMsg.Event == "kf_msg_or_event" {
+			log.Printf("[Relay] Received kf_msg_or_event, token=%s", receivedMsg.Token)
+			p.handleKfEvent(receivedMsg.Token)
+		} else {
+			log.Printf("[Relay] Ignoring event: %s", receivedMsg.Event)
+		}
 		return
 	}
 
@@ -776,6 +798,113 @@ func (p *Platform) handleRawWeComMessage(data []byte) {
 
 	if p.messageHandler != nil {
 		p.messageHandler(routerMsg)
+	}
+}
+
+// initKfCursors does an initial sync to set cursors, skipping historical messages
+func (p *Platform) initKfCursors() {
+	if p.wecomPlatform == nil {
+		return
+	}
+
+	accounts, err := p.wecomPlatform.ListKfAccounts()
+	if err != nil {
+		log.Printf("[Relay] Failed to list kf accounts for cursor init: %v", err)
+		return
+	}
+
+	for _, acc := range accounts {
+		result, err := p.wecomPlatform.SyncKfMessages("", "", acc.OpenKfID, 1000)
+		if err != nil {
+			log.Printf("[Relay] Failed to init cursor for kf %s: %v", acc.OpenKfID, err)
+			continue
+		}
+		if result.NextCursor != "" {
+			p.kfCursorsMu.Lock()
+			p.kfCursors[acc.OpenKfID] = result.NextCursor
+			p.kfCursorsMu.Unlock()
+		}
+		log.Printf("[Relay] KF cursor initialized for %s (%s): skipped %d historical messages", acc.Name, acc.OpenKfID, len(result.MsgList))
+	}
+}
+
+// handleKfEvent processes a kf_msg_or_event by calling sync_msg to fetch actual messages
+func (p *Platform) handleKfEvent(token string) {
+	if p.wecomPlatform == nil {
+		log.Printf("[Relay] Cannot handle kf event: WeCom platform not initialized")
+		return
+	}
+
+	// List kf accounts to get open_kfid(s)
+	accounts, err := p.wecomPlatform.ListKfAccounts()
+	if err != nil {
+		log.Printf("[Relay] Failed to list kf accounts: %v", err)
+		return
+	}
+
+	if len(accounts) == 0 {
+		log.Printf("[Relay] No kf accounts found")
+		return
+	}
+
+	// Sync messages from each kf account, using saved cursor to avoid re-processing
+	var allMessages []wecom.KfMessage
+	for _, acc := range accounts {
+		p.kfCursorsMu.Lock()
+		cursor := p.kfCursors[acc.OpenKfID]
+		p.kfCursorsMu.Unlock()
+
+		result, err := p.wecomPlatform.SyncKfMessages(token, cursor, acc.OpenKfID, 1000)
+		if err != nil {
+			log.Printf("[Relay] Failed to sync kf messages for %s (%s): %v", acc.Name, acc.OpenKfID, err)
+			continue
+		}
+
+		// Save cursor for next sync
+		if result.NextCursor != "" {
+			p.kfCursorsMu.Lock()
+			p.kfCursors[acc.OpenKfID] = result.NextCursor
+			p.kfCursorsMu.Unlock()
+		}
+
+		log.Printf("[Relay] KF sync_msg for %s: %d messages, has_more=%d, cursor=%s", acc.Name, len(result.MsgList), result.HasMore, result.NextCursor)
+		allMessages = append(allMessages, result.MsgList...)
+	}
+
+	for _, msg := range allMessages {
+		// Only process messages from customers (origin=3)
+		if msg.Origin != 3 {
+			log.Printf("[Relay] Skipping kf message origin=%d, type=%s", msg.Origin, msg.MsgType)
+			continue
+		}
+
+		if msg.MsgType != "text" || msg.Text == nil || msg.Text.Content == "" {
+			log.Printf("[Relay] Skipping non-text kf message: type=%s, msgid=%s", msg.MsgType, msg.MsgID)
+			continue
+		}
+
+		log.Printf("[Relay] KF message from %s via %s: %s", msg.ExternalUserID, msg.OpenKfID, msg.Text.Content)
+
+		routerMsg := router.Message{
+			ID:        msg.MsgID,
+			Platform:  "relay",
+			ChannelID: msg.ExternalUserID,
+			UserID:    msg.ExternalUserID,
+			Username:  msg.ExternalUserID,
+			Text:      strings.TrimSpace(msg.Text.Content),
+			Metadata: map[string]string{
+				"message_id":      msg.MsgID,
+				"corp_id":         p.config.WeComCorpID,
+				"msg_type":        msg.MsgType,
+				"kf":              "true",
+				"open_kfid":       msg.OpenKfID,
+				"external_userid": msg.ExternalUserID,
+			},
+		}
+
+		if p.messageHandler != nil {
+			p.messageHandler(routerMsg)
+		}
 	}
 }
 

@@ -107,12 +107,23 @@ func (r *Router) handleMessage(msg Message) {
 		if msg.ThreadID != "" {
 			resp.ThreadID = msg.ThreadID
 		}
+		// Propagate message metadata to response for platform-specific routing (e.g., kf messages)
+		if resp.Metadata == nil {
+			resp.Metadata = msg.Metadata
+		} else if msg.Metadata != nil {
+			for k, v := range msg.Metadata {
+				if _, exists := resp.Metadata[k]; !exists {
+					resp.Metadata[k] = v
+				}
+			}
+		}
 		if err := platform.Send(ctx, msg.ChannelID, resp); err != nil {
 			logger.Error("[Router] Error sending response: %v", err)
 			// Try to notify the user about the error in chat
 			errResp := Response{
 				Text:     fmt.Sprintf("[Error] %v", err),
 				ThreadID: resp.ThreadID,
+				Metadata: resp.Metadata, // Preserve routing metadata (e.g., kf)
 			}
 			if notifyErr := platform.Send(ctx, msg.ChannelID, errResp); notifyErr != nil {
 				logger.Error("[Router] Failed to send error notification: %v", notifyErr)
