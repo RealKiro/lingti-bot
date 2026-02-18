@@ -163,7 +163,28 @@ func executeFileTrash(ctx context.Context, args map[string]any) string {
 }
 
 // executeFileRead reads a file
+// sensitiveFilePatterns contains file name patterns that should never be read by the AI agent.
+var sensitiveFilePatterns = []string{
+	".env", "credentials", ".pem", ".key",
+	"id_rsa", "id_ed25519", ".htpasswd", ".netrc",
+}
+
+// isSensitiveFile checks if a file path matches sensitive patterns.
+func isSensitiveFile(path string) bool {
+	base := strings.ToLower(filepath.Base(path))
+	for _, p := range sensitiveFilePatterns {
+		if strings.Contains(base, p) {
+			return true
+		}
+	}
+	return false
+}
+
 func executeFileRead(ctx context.Context, path string) string {
+	if isSensitiveFile(path) {
+		return "ACCESS DENIED: reading sensitive files (.env, credentials, keys) is blocked for security. Do NOT retry."
+	}
+
 	req := mcp.CallToolRequest{}
 	req.Params.Arguments = map[string]interface{}{
 		"path": path,
@@ -197,13 +218,22 @@ func executeFileWrite(ctx context.Context, path string, content string) string {
 func executeShell(ctx context.Context, command string) string {
 	logger.Debug("[Shell] Executing: %s", command)
 
-	// Safety check
+	// Safety check - dangerous commands
 	blocked := []string{"rm -rf /", "mkfs", "dd if="}
 	cmdLower := strings.ToLower(command)
 	for _, b := range blocked {
 		if strings.Contains(cmdLower, b) {
 			logger.Debug("[Shell] Command blocked for safety")
 			return "Command blocked for safety"
+		}
+	}
+
+	// Safety check - block reading sensitive files via shell
+	// Check if command references any sensitive file patterns
+	for _, pat := range sensitiveFilePatterns {
+		if strings.Contains(cmdLower, pat) {
+			logger.Warn("[Shell] Command blocked: references sensitive file pattern '%s'", pat)
+			return "ACCESS DENIED: reading sensitive files (.env, credentials, keys) is blocked for security. Do NOT retry."
 		}
 	}
 
