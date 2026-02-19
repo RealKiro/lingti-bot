@@ -96,9 +96,9 @@ func BrowserNavigate(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolR
 		return mcp.NewToolResultError(fmt.Sprintf("failed to start browser: %v", err)), nil
 	}
 
-	page, err := b.ActivePage()
+	page, err := b.NavigationPage()
 	if err != nil {
-		logger.Debug("[browser_navigate] ActivePage failed: %v", err)
+		logger.Debug("[browser_navigate] NavigationPage failed: %v", err)
 		return mcp.NewToolResultError(fmt.Sprintf("failed to get page: %v", err)), nil
 	}
 
@@ -109,10 +109,12 @@ func BrowserNavigate(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolR
 	}
 
 	logger.Debug("[browser_navigate] waiting for page load...")
-	if err := page.WaitLoad(); err != nil {
-		logger.Debug("[browser_navigate] WaitLoad failed: %v", err)
-		return mcp.NewToolResultError(fmt.Sprintf("page load error: %v", err)), nil
-	}
+	// WaitLoad may return "navigated or closed" on redirects — non-fatal.
+	_ = page.WaitLoad()
+
+	// Record this as the bot's current working page so snapshot/click/type
+	// all operate on this tab rather than opening new ones.
+	b.SetCurrentPage(page)
 
 	info, err := page.Info()
 	if err != nil {

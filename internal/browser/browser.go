@@ -26,6 +26,10 @@ type Browser struct {
 	connected bool // true when attached to external Chrome (don't close on Stop)
 	dataDir   string
 
+	// currentPage is the page most recently opened/navigated by the bot.
+	// snapshot/click/type all operate on this page so they stay on the same tab.
+	currentPage *rod.Page
+
 	// refs holds the latest snapshot ref map (ref number → RefEntry).
 	refs map[int]RefEntry
 
@@ -181,6 +185,7 @@ func (b *Browser) Stop() error {
 	b.browser = nil
 	b.running = false
 	b.connected = false
+	b.currentPage = nil
 	b.refs = make(map[int]RefEntry)
 	return nil
 }
@@ -241,10 +246,9 @@ func (b *Browser) Rod() *rod.Browser {
 	return b.browser
 }
 
-// ActivePage returns the current page for automation workflows.
-// When connected to the user's existing Chrome (connected mode), it always
-// opens a new tab to avoid hijacking the user's current page.
-// When running a bot-launched Chrome, it reuses the existing first tab.
+// ActivePage returns the page the bot is currently working on.
+// Returns currentPage if one has been set (by browser_navigate).
+// Falls back to the first available tab, or creates a blank one if none exist.
 func (b *Browser) ActivePage() (*rod.Page, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -253,17 +257,10 @@ func (b *Browser) ActivePage() (*rod.Page, error) {
 		return nil, fmt.Errorf("browser not running")
 	}
 
-	// In connected mode (user's own Chrome), always open a new tab so we
-	// never hijack whatever the user currently has open.
-	if b.connected {
-		page, err := b.browser.Page(proto.TargetCreateTarget{URL: "about:blank"})
-		if err != nil {
-			return nil, fmt.Errorf("failed to open new tab: %w", err)
-		}
-		return page, nil
+	if b.currentPage != nil {
+		return b.currentPage, nil
 	}
 
-	// Bot-launched Chrome: reuse the existing first tab for workflow continuity.
 	pages, err := b.browser.Pages()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get pages: %w", err)
@@ -276,6 +273,34 @@ func (b *Browser) ActivePage() (*rod.Page, error) {
 		return page, nil
 	}
 	return pages.First(), nil
+}
+
+// SetCurrentPage records the page the bot is currently working on.
+// Called by browser_navigate after opening/navigating a tab.
+func (b *Browser) SetCurrentPage(page *rod.Page) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.currentPage = page
+}
+
+// NavigationPage returns the page to use for a browser_navigate call.
+// In connected mode (user's existing Chrome) it opens a fresh tab so the
+// user's current page is never hijacked.
+// In launched mode it reuses/creates the first tab for workflow continuity.
+func (b *Browser) NavigationPage() (*rod.Page, error) {
+	b.mu.Lock()
+	connected := b.connected
+	brow := b.browser
+	b.mu.Unlock()
+
+	if connected {
+		page, err := brow.Page(proto.TargetCreateTarget{URL: "about:blank"})
+		if err != nil {
+			return nil, fmt.Errorf("failed to open new tab: %w", err)
+		}
+		return page, nil
+	}
+	return b.ActivePage()
 }
 
 // SetRefs stores the ref map from a snapshot.
