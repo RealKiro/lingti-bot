@@ -455,8 +455,8 @@ func BrowserClickAll(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolR
 // BrowserTabs lists all open tabs.
 func BrowserTabs(_ context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	b := browser.Instance()
-	if !b.IsRunning() {
-		return mcp.NewToolResultError("browser not running"), nil
+	if err := b.EnsureRunning(); err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to start browser: %v", err)), nil
 	}
 
 	pages, err := b.Rod().Pages()
@@ -517,8 +517,8 @@ func BrowserTabOpen(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolRe
 // BrowserTabClose closes a tab by target ID or the active tab.
 func BrowserTabClose(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	b := browser.Instance()
-	if !b.IsRunning() {
-		return mcp.NewToolResultError("browser not running"), nil
+	if err := b.EnsureRunning(); err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to start browser: %v", err)), nil
 	}
 
 	targetID := ""
