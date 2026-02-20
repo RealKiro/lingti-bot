@@ -240,6 +240,16 @@ func BrowserScreenshot(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToo
 	return mcp.NewToolResultText(fmt.Sprintf("Screenshot saved to: %s", absPath)), nil
 }
 
+// truncateSnapshot limits a snapshot string to maxLines lines to keep tool results concise.
+// Full snapshots in every tool result bloat the context and cause DeepSeek to stop early.
+func truncateSnapshot(snapshot string, maxLines int) string {
+	lines := strings.SplitN(snapshot, "\n", maxLines+1)
+	if len(lines) <= maxLines {
+		return snapshot
+	}
+	return strings.Join(lines[:maxLines], "\n") + fmt.Sprintf("\n... (%d lines truncated — call browser_snapshot for full view)", len(strings.Split(snapshot, "\n"))-maxLines)
+}
+
 // BrowserClick clicks an element by ref number.
 func BrowserClick(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	ref, ok := req.Params.Arguments["ref"].(float64)
@@ -293,7 +303,21 @@ func BrowserClick(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResu
 
 	entry, _ := b.GetRef(int(ref))
 	logger.Debug("[browser_click] clicked [%d] %s %q", int(ref), entry.Role, entry.Name)
-	return mcp.NewToolResultText(fmt.Sprintf("Clicked [%d] %s %q", int(ref), entry.Role, entry.Name)), nil
+	clickMsg := fmt.Sprintf("Clicked [%d] %s %q", int(ref), entry.Role, entry.Name)
+
+	// Get page URL/title so the model knows where it landed, but do NOT embed a full snapshot.
+	// Embedding the snapshot here bloats the context and DeepSeek stops early because it only
+	// sees the top of the page (comment box is often below the fold).
+	// Instead, tell the model the page changed and it MUST call browser_snapshot next.
+	info, _ := page.Info()
+	if info != nil {
+		clickMsg += fmt.Sprintf("\n\nNow on: %s\nTitle: %s\n\nThe page has changed. Call browser_snapshot to see the current page elements and continue with the next action.", info.URL, info.Title)
+	} else {
+		clickMsg += "\n\nThe page may have changed. Call browser_snapshot to see the current page elements and continue with the next action."
+	}
+
+	logger.Debug("[browser_click] done, instructing model to snapshot")
+	return mcp.NewToolResultText(clickMsg), nil
 }
 
 // BrowserType types text into an element by ref number.
@@ -359,12 +383,24 @@ func BrowserType(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResul
 		return mcp.NewToolResultError(fmt.Sprintf("failed to type into ref %d: %v", int(ref), err)), nil
 	}
 
-	msg := fmt.Sprintf("Typed %q into [%d]", text, int(ref))
+	typeMsg := fmt.Sprintf("Typed %q into [%d]", text, int(ref))
 	if submit {
-		msg += " and pressed Enter"
+		typeMsg += " and pressed Enter"
 	}
-	logger.Debug("[browser_type] %s", msg)
-	return mcp.NewToolResultText(msg), nil
+	logger.Debug("[browser_type] %s", typeMsg)
+
+	info, _ := page.Info()
+	hint := typeMsg
+	if !submit {
+		hint += "\n\nText typed but NOT submitted — use browser_press key=\"Enter\" or click the submit button to trigger the action."
+	} else {
+		hint += "\n\nPage may have changed after submit. Call browser_snapshot to see current elements and continue."
+	}
+	// Include brief page info so the model knows where it is, without the full snapshot.
+	if info != nil {
+		hint += fmt.Sprintf("\nNow on: %s | Title: %s", info.URL, info.Title)
+	}
+	return mcp.NewToolResultText(hint), nil
 }
 
 // BrowserPress presses a keyboard key.

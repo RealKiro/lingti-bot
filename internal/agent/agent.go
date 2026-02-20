@@ -482,6 +482,21 @@ You MUST follow the **snapshot-then-act** pattern for ALL browser interactions:
 
 Use the page's UI elements (search boxes, buttons, menus) to accomplish the task step by step. Refs are invalidated after page changes — always re-snapshot.
 
+**CRITICAL: Multi-step browser tasks MUST continue until fully complete.**
+- After browser_click returns a page snapshot, you MUST examine the snapshot and take the NEXT required action (type, click, snapshot, etc.).
+- NEVER stop after a single browser action unless the user's ENTIRE request has been fulfilled.
+- Seeing a page snapshot in a tool result means: "here is the current state — what should I do next?"
+- If you see a login modal or any obstacle, handle it (dismiss, log in, or report to user) — do not silently stop.
+
+**Zhihu (知乎) commenting workflow:**
+To post a comment on a Zhihu answer (not write a full answer):
+1. Find a "评论" button or "X条评论" link under the answer — click it to expand the comment section
+2. After clicking, the comment input box appears. Take browser_snapshot to find the textbox ref
+3. browser_type into the comment textbox
+4. Click the "发布" or "确定" submit button
+- DO NOT click "写回答" — that creates a full answer, not a comment
+- If the comment button is not visible, scroll down with browser_execute_js (script: "window.scrollBy(0, 500)") then re-snapshot
+
 **Handling modals/overlays:** If an element is blocked by a modal or overlay (error message mentions "element covered by"), use browser_execute_js to dismiss it. Example scripts:
 - document.querySelector('.modal-overlay').remove()
 - document.querySelector('.dialog-close-btn').click()
@@ -533,11 +548,21 @@ Current date: %s%s%s`, autoApprovalNotice, runtime.GOOS, runtime.GOARCH, homeDir
 			break
 		}
 
-		// Process tool calls and track counts
+		// Process tool calls and track counts; detect stalls
+		stallHint := ""
 		for _, tc := range resp.ToolCalls {
 			toolCallCounts[tc.Name]++
-			if toolCallCounts[tc.Name] > 1 {
-				logger.Warn("[Agent] Tool %s called %d times (round %d/%d, user: %s)", tc.Name, toolCallCounts[tc.Name], round+1, maxToolRounds, msg.Username)
+			count := toolCallCounts[tc.Name]
+			if count > 1 {
+				logger.Warn("[Agent] Tool %s called %d times (round %d/%d, user: %s)", tc.Name, count, round+1, maxToolRounds, msg.Username)
+			}
+			if count == 4 && strings.HasPrefix(tc.Name, "browser_") {
+				stallHint = fmt.Sprintf(
+					"\n\n[SYSTEM HINT] You have called %s %d times without completing the task. "+
+						"Try a different approach: use browser_execute_js to inspect the page structure, "+
+						"scroll to reveal hidden elements, or look for a different UI element to interact with.",
+					tc.Name, count,
+				)
 			}
 		}
 
@@ -558,24 +583,45 @@ Current date: %s%s%s`, autoApprovalNotice, runtime.GOOS, runtime.GOARCH, homeDir
 			ToolCalls: resp.ToolCalls,
 		})
 
-		// Add tool results
-		for _, result := range toolResults {
+		// Add tool results; append stall hint to last result if detected
+		for i, result := range toolResults {
+			if stallHint != "" && i == len(toolResults)-1 {
+				result.Content += stallHint
+			}
 			messages = append(messages, Message{
 				Role:       "user",
 				ToolResult: &result,
 			})
 		}
 
-		// Continue the conversation
-		resp, err = a.provider.Chat(ctx, ChatRequest{
+		// Detect if any browser tool was used this round.
+		hasBrowserTool := false
+		for _, tc := range resp.ToolCalls {
+			if strings.HasPrefix(tc.Name, "browser_") {
+				hasBrowserTool = true
+				break
+			}
+		}
+
+		// Continue the conversation.
+		// Force tool_choice="required" when the last round used browser tools so DeepSeek
+		// cannot return a bare text response — it must call another tool to continue.
+		// Use a per-call timeout so a stalled API call doesn't hang the agent forever.
+		logger.Info("[Agent] Calling AI (round %d/%d, forceToolUse=%v, user: %s)", round+2, maxToolRounds, hasBrowserTool, msg.Username)
+		callCtx, callCancel := context.WithTimeout(ctx, 60*time.Second)
+		resp, err = a.provider.Chat(callCtx, ChatRequest{
 			Messages:     messages,
 			SystemPrompt: systemPrompt,
 			Tools:        tools,
 			MaxTokens:    4096,
+			ForceToolUse: hasBrowserTool,
 		})
+		callCancel()
 		if err != nil {
+			logger.Warn("[Agent] AI call failed (round %d, forceToolUse=%v): %v", round+2, hasBrowserTool, err)
 			return router.Response{}, fmt.Errorf("AI error: %w", err)
 		}
+		logger.Info("[Agent] AI response (round %d): finish_reason=%s tools=%d content_len=%d", round+2, resp.FinishReason, len(resp.ToolCalls), len(resp.Content))
 	}
 	if resp.FinishReason == "tool_use" {
 		logger.Warn("[Agent] Tool loop hit max rounds (%d), forcing stop (user: %s)", maxToolRounds, msg.Username)

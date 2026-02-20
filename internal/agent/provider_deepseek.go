@@ -104,6 +104,9 @@ func (p *DeepSeekProvider) Chat(ctx context.Context, req ChatRequest) (ChatRespo
 	if len(tools) > 0 {
 		chatReq.Tools = tools
 	}
+	if req.ForceToolUse && len(tools) > 0 {
+		chatReq.ToolChoice = "required"
+	}
 
 	// Call DeepSeek API
 	resp, err := p.client.CreateChatCompletion(ctx, chatReq)

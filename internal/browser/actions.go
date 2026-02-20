@@ -1,6 +1,7 @@
 package browser
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -11,6 +12,15 @@ import (
 	"github.com/go-rod/rod/lib/proto"
 )
 
+// waitStable waits for the page to stop changing, but caps the wait at maxWait.
+// rod's WaitStable(interval) can block forever on pages with continuous animations or
+// infinite scroll (e.g. Zhihu search results). This wrapper prevents that.
+func waitStable(page *rod.Page, interval, maxWait time.Duration) {
+	ctx, cancel := context.WithTimeout(context.Background(), maxWait)
+	defer cancel()
+	_ = page.Context(ctx).WaitStable(interval)
+}
+
 // Click clicks the element identified by the given ref number.
 // It scrolls the element into view, waits for it to be interactable, then clicks.
 func Click(page *rod.Page, b *Browser, ref int) error {
@@ -19,27 +29,38 @@ func Click(page *rod.Page, b *Browser, ref int) error {
 		return captureErrorScreenshot(page, b, "click_resolve", ref, err)
 	}
 
+	// Wrap all element operations in a bounded context so that clicking elements that
+	// trigger heavy AJAX (e.g. Zhihu comment panels) never hangs indefinitely.
+	opCtx, opCancel := context.WithTimeout(context.Background(), 8*time.Second)
+	defer opCancel()
+	bel := el.Context(opCtx)
+
 	// Scroll into view so the element is visible
-	if err := el.ScrollIntoView(); err != nil {
-		// Not fatal — element might already be in view
-		_ = err
+	if err := bel.ScrollIntoView(); err != nil {
+		_ = err // not fatal — element might already be in view
 	}
 
 	// Wait for element to be interactable (visible + not covered)
-	if _, err := el.Interactable(); err != nil {
-		// Try a short wait and retry once
-		time.Sleep(500 * time.Millisecond)
-		if _, err := el.Interactable(); err != nil {
+	if _, err := bel.Interactable(); err != nil {
+		time.Sleep(300 * time.Millisecond)
+		if _, err := bel.Interactable(); err != nil {
 			return captureErrorScreenshot(page, b, "click_not_interactable", ref, fmt.Errorf("element [%d] not interactable: %w", ref, err))
 		}
 	}
 
-	if err := el.Click(proto.InputMouseButtonLeft, 1); err != nil {
-		return captureErrorScreenshot(page, b, "click_failed", ref, fmt.Errorf("click failed: %w", err))
+	// Use JavaScript click() instead of rod's mouse simulation.
+	// Rod's Click() can hang when the target triggers a page navigation or heavy AJAX
+	// (e.g. Zhihu comment panels) because rod waits internally for load events.
+	// JS element.click() fires the event and returns immediately — no waiting.
+	if _, err := bel.Eval(`() => { this.click(); return true; }`); err != nil {
+		// Fall back to rod mouse click if JS eval fails
+		if err2 := bel.Click(proto.InputMouseButtonLeft, 1); err2 != nil {
+			return captureErrorScreenshot(page, b, "click_failed", ref, fmt.Errorf("click failed: %w", err2))
+		}
 	}
 
-	// Wait briefly for page to settle after click (animations, AJAX, etc.)
-	_ = page.WaitStable(300 * time.Millisecond)
+	// Brief settle wait (capped so it never hangs)
+	waitStable(page, 300*time.Millisecond, 2*time.Second)
 
 	return nil
 }
@@ -52,15 +73,19 @@ func Type(page *rod.Page, b *Browser, ref int, text string, submit bool) error {
 		return captureErrorScreenshot(page, b, "type_resolve", ref, err)
 	}
 
+	opCtx, opCancel := context.WithTimeout(context.Background(), 8*time.Second)
+	defer opCancel()
+	bel := el.Context(opCtx)
+
 	// Scroll into view
-	if err := el.ScrollIntoView(); err != nil {
+	if err := bel.ScrollIntoView(); err != nil {
 		_ = err
 	}
 
 	// Click to focus the element first — critical for search boxes, inputs, etc.
-	if err := el.Click(proto.InputMouseButtonLeft, 1); err != nil {
+	if err := bel.Click(proto.InputMouseButtonLeft, 1); err != nil {
 		// Try Focus as fallback
-		if err := el.Focus(); err != nil {
+		if err := bel.Focus(); err != nil {
 			return captureErrorScreenshot(page, b, "type_focus", ref, fmt.Errorf("failed to focus element [%d]: %w", ref, err))
 		}
 	}
@@ -69,24 +94,21 @@ func Type(page *rod.Page, b *Browser, ref int, text string, submit bool) error {
 	time.Sleep(200 * time.Millisecond)
 
 	// Clear existing content
-	if err := el.SelectAllText(); err != nil {
-		// Element might not have text, ignore
+	if err := bel.SelectAllText(); err != nil {
 		_ = err
 	}
 
 	// Input text
-	if err := el.Input(text); err != nil {
+	if err := bel.Input(text); err != nil {
 		return captureErrorScreenshot(page, b, "type_input", ref, fmt.Errorf("failed to type text: %w", err))
 	}
 
 	if submit {
-		// Small delay before submit to let input handlers process
 		time.Sleep(100 * time.Millisecond)
-		if err := el.Type(input.Enter); err != nil {
+		if err := bel.Type(input.Enter); err != nil {
 			return captureErrorScreenshot(page, b, "type_submit", ref, fmt.Errorf("failed to press Enter: %w", err))
 		}
-		// Wait for page to settle after submit (navigation/AJAX)
-		_ = page.WaitStable(500 * time.Millisecond)
+		waitStable(page, 500*time.Millisecond, 3*time.Second)
 	}
 
 	return nil
@@ -102,7 +124,7 @@ func Press(page *rod.Page, key string) error {
 		return err
 	}
 	// Wait for page to settle after key press
-	_ = page.WaitStable(300 * time.Millisecond)
+	waitStable(page, 300*time.Millisecond, 3*time.Second)
 	return nil
 }
 
@@ -171,7 +193,7 @@ func ClickAll(page *rod.Page, selector string, delay time.Duration, skipSelector
 		// Scroll down to load more content
 		_ = page.Mouse.Scroll(0, 800, 0)
 		time.Sleep(1500 * time.Millisecond)
-		_ = page.WaitStable(500 * time.Millisecond)
+		waitStable(page, 500*time.Millisecond, 3*time.Second)
 
 		// Check if new elements appeared after scrolling
 		newElements, _ := page.Elements(selector)

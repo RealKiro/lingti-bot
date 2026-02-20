@@ -20,6 +20,9 @@ type ChatRequest struct {
 	SystemPrompt string
 	Tools        []Tool
 	MaxTokens    int
+	// ForceToolUse, when true, sets tool_choice="required" so the model must call a tool.
+	// Use this during multi-step browser tasks to prevent premature stop responses.
+	ForceToolUse bool
 }
 
 // ChatResponse represents a chat completion response
