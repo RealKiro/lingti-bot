@@ -246,6 +246,39 @@ func (b *Browser) Rod() *rod.Browser {
 	return b.browser
 }
 
+// PageCount returns the number of open tabs.
+func (b *Browser) PageCount() int {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.browser == nil {
+		return 0
+	}
+	pages, err := b.browser.Pages()
+	if err != nil {
+		return 0
+	}
+	return len(pages)
+}
+
+// SwitchToNewestPage updates currentPage to the most recently opened tab,
+// if a new tab has appeared since lastCount. Returns true if switched.
+func (b *Browser) SwitchToNewestPage(lastCount int) bool {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.browser == nil {
+		return false
+	}
+	pages, err := b.browser.Pages()
+	if err != nil || len(pages) <= lastCount {
+		return false
+	}
+	// The newest tab is the last one
+	newest := pages[len(pages)-1]
+	b.currentPage = newest
+	b.refs = make(map[int]RefEntry) // invalidate refs for old page
+	return true
+}
+
 // ActivePage returns the page the bot is currently working on.
 // Returns currentPage if one has been set (by browser_navigate).
 // Falls back to the first available tab, or creates a blank one if none exist.

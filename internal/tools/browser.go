@@ -265,6 +265,9 @@ func BrowserClick(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResu
 		return mcp.NewToolResultError(fmt.Sprintf("failed to get page: %v", err)), nil
 	}
 
+	// Record tab count before the click so we can detect if a new tab opens.
+	tabsBefore := b.PageCount()
+
 	// Try to click the element
 	if err := browser.Click(page, b, int(ref)); err != nil {
 		logger.Debug("[browser_click] Click failed: %v", err)
@@ -305,16 +308,22 @@ func BrowserClick(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResu
 	logger.Debug("[browser_click] clicked [%d] %s %q", int(ref), entry.Role, entry.Name)
 	clickMsg := fmt.Sprintf("Clicked [%d] %s %q", int(ref), entry.Role, entry.Name)
 
-	// Get page URL/title so the model knows where it landed, but do NOT embed a full snapshot.
-	// Embedding the snapshot here bloats the context and DeepSeek stops early because it only
-	// sees the top of the page (comment box is often below the fold).
-	// Instead, tell the model the page changed and it MUST call browser_snapshot next.
-	info, _ := page.Info()
-	if info != nil {
-		clickMsg += fmt.Sprintf("\n\nNow on: %s\nTitle: %s\n\nThe page has changed. Call browser_snapshot to see the current page elements and continue with the next action.", info.URL, info.Title)
-	} else {
-		clickMsg += "\n\nThe page may have changed. Call browser_snapshot to see the current page elements and continue with the next action."
+	// Wait a moment for any new tab to open, then detect and switch to it.
+	time.Sleep(500 * time.Millisecond)
+	if switched := b.SwitchToNewestPage(tabsBefore); switched {
+		logger.Debug("[browser_click] new tab detected, switched currentPage")
+		clickMsg += "\n\n⚠ A new tab was opened by this click. Bot is now tracking the new tab."
 	}
+
+	// Get page URL/title from the (possibly new) active page.
+	activePage, _ := b.ActivePage()
+	if activePage != nil {
+		info, _ := activePage.Info()
+		if info != nil {
+			clickMsg += fmt.Sprintf("\n\nNow on: %s\nTitle: %s", info.URL, info.Title)
+		}
+	}
+	clickMsg += "\n\nCall browser_snapshot to see the current page elements and continue with the next action."
 
 	logger.Debug("[browser_click] done, instructing model to snapshot")
 	return mcp.NewToolResultText(clickMsg), nil

@@ -222,9 +222,12 @@ func resolveRef(page *rod.Page, b *Browser, ref int) (*rod.Element, error) {
 
 // resolveBackendNode converts a BackendDOMNodeID to a rod Element.
 func resolveBackendNode(page *rod.Page, backendNodeID proto.DOMBackendNodeID) (*rod.Element, error) {
+	// Use a bounded context so CDP calls don't hang when the page is navigating.
+	rCtx, rCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer rCancel()
 	result, err := proto.DOMResolveNode{
 		BackendNodeID: backendNodeID,
-	}.Call(page)
+	}.Call(page.Context(rCtx))
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve node (element may have been removed from page): %w", err)
 	}

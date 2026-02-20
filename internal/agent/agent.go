@@ -489,13 +489,16 @@ Use the page's UI elements (search boxes, buttons, menus) to accomplish the task
 - If you see a login modal or any obstacle, handle it (dismiss, log in, or report to user) — do not silently stop.
 
 **Zhihu (知乎) commenting workflow:**
-To post a comment on a Zhihu answer (not write a full answer):
-1. Find a "评论" button or "X条评论" link under the answer — click it to expand the comment section
-2. After clicking, the comment input box appears. Take browser_snapshot to find the textbox ref
-3. browser_type into the comment textbox
-4. Click the "发布" or "确定" submit button
+Zhihu comment inputs are often contenteditable divs — they may NOT appear as textbox in the snapshot.
+PREFERRED approach (most reliable): use browser_execute_js directly to type and submit the comment:
+Step 1 - Click the comment button to expand the section (browser_click on "X条评论" button)
+Step 2 - Use browser_execute_js to type the comment text and submit:
+  script: "var el = document.querySelector('.CommentInput textarea, textarea[placeholder*=\"评论\"], .CommentInput-input'); if(el){ el.focus(); el.value='COMMENT_TEXT'; el.dispatchEvent(new Event('input',{bubbles:true})); } return el ? 'found' : 'not found';"
+  Then click the submit button (browser_snapshot to find "发布"/"确定" button ref, then browser_click it)
+Step 3 - If Step 2 returns "not found", try: script: "document.querySelector('[contenteditable]')?.focus(); return document.querySelector('[contenteditable]')?.textContent;"
+  Then browser_type into any contenteditable textbox ref found in snapshot
 - DO NOT click "写回答" — that creates a full answer, not a comment
-- If the comment button is not visible, scroll down with browser_execute_js (script: "window.scrollBy(0, 500)") then re-snapshot
+- If the comment button is not visible, scroll down: browser_execute_js script: "window.scrollBy(0, 500)" then re-snapshot
 
 **Handling modals/overlays:** If an element is blocked by a modal or overlay (error message mentions "element covered by"), use browser_execute_js to dismiss it. Example scripts:
 - document.querySelector('.modal-overlay').remove()
@@ -619,6 +622,26 @@ Current date: %s%s%s`, autoApprovalNotice, runtime.GOOS, runtime.GOARCH, homeDir
 		callCancel()
 		if err != nil {
 			logger.Warn("[Agent] AI call failed (round %d, forceToolUse=%v): %v", round+2, hasBrowserTool, err)
+			// Log message count and last few messages to help diagnose what triggered the failure
+			logger.Warn("[Agent] Request had %d messages; last message role=%s content_len=%d",
+				len(messages),
+				func() string {
+					if len(messages) > 0 {
+						return messages[len(messages)-1].Role
+					}
+					return "none"
+				}(),
+				func() int {
+					if len(messages) > 0 {
+						m := messages[len(messages)-1]
+						if m.ToolResult != nil {
+							return len(m.ToolResult.Content)
+						}
+						return len(m.Content)
+					}
+					return 0
+				}(),
+			)
 			return router.Response{}, fmt.Errorf("AI error: %w", err)
 		}
 		logger.Info("[Agent] AI response (round %d): finish_reason=%s tools=%d content_len=%d", round+2, resp.FinishReason, len(resp.ToolCalls), len(resp.Content))

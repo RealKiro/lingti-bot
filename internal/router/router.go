@@ -86,7 +86,9 @@ func (r *Router) Register(platform Platform) {
 
 // handleMessage processes an incoming message
 func (r *Router) handleMessage(msg Message) {
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	// Use a generous timeout for the agent work — browser automation tasks can take
+	// many rounds (each ~5s) so 2 minutes is far too short.
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
 	logger.Info("[Router] Message from %s/%s: %s", msg.Platform, msg.Username, msg.Text)
@@ -97,6 +99,11 @@ func (r *Router) handleMessage(msg Message) {
 		logger.Error("[Router] Error handling message: %v", err)
 		resp = Response{Text: friendlyError(err)}
 	}
+
+	// Use a fresh context for sending the response so that an expired agent context
+	// doesn't prevent the reply from being delivered.
+	sendCtx, sendCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer sendCancel()
 
 	// Send response back to the platform
 	r.mu.RLock()
@@ -117,7 +124,7 @@ func (r *Router) handleMessage(msg Message) {
 				}
 			}
 		}
-		if err := platform.Send(ctx, msg.ChannelID, resp); err != nil {
+		if err := platform.Send(sendCtx, msg.ChannelID, resp); err != nil {
 			logger.Error("[Router] Error sending response: %v", err)
 			// Try to notify the user about the error in chat
 			errResp := Response{
@@ -125,7 +132,7 @@ func (r *Router) handleMessage(msg Message) {
 				ThreadID: resp.ThreadID,
 				Metadata: resp.Metadata, // Preserve routing metadata (e.g., kf)
 			}
-			if notifyErr := platform.Send(ctx, msg.ChannelID, errResp); notifyErr != nil {
+			if notifyErr := platform.Send(sendCtx, msg.ChannelID, errResp); notifyErr != nil {
 				logger.Error("[Router] Failed to send error notification: %v", notifyErr)
 			}
 		}
