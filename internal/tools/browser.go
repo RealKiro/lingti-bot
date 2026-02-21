@@ -449,10 +449,28 @@ func BrowserCommentZhihu(_ context.Context, req mcp.CallToolRequest) (*mcp.CallT
 		return mcp.NewToolResultError(fmt.Sprintf("failed to get page: %v", err)), nil
 	}
 
-	// Step 1: expand comments on the first answer
+	// Step 1: click any comment-related button (添加评论, X条评论, 评论 etc.)
+	// Try multiple selectors to find a comment trigger button.
 	r1, err := browser.ExecuteJS(page, `
-		var btn = document.querySelector('button.ContentItem-action');
-		if (btn) { btn.click(); return 'clicked: ' + btn.textContent.trim(); }
+		// Try specific comment action buttons first
+		var selectors = [
+			'button.ContentItem-action',
+			'button[aria-label*="评论"]',
+			'span.ContentItem-action',
+		];
+		for (var i = 0; i < selectors.length; i++) {
+			var btns = Array.from(document.querySelectorAll(selectors[i]));
+			var btn = btns.find(function(b) {
+				var t = b.textContent.trim();
+				return t.includes('评论') || t.includes('comment');
+			});
+			if (btn) { btn.click(); return 'clicked: ' + btn.textContent.trim(); }
+		}
+		// Fallback: any element with 评论 text that looks clickable
+		var all = Array.from(document.querySelectorAll('button,span,a')).filter(function(e) {
+			return e.textContent.trim().match(/^[\d\s]*评论$/) || e.textContent.trim() === '添加评论';
+		});
+		if (all.length > 0) { all[0].click(); return 'fallback clicked: ' + all[0].textContent.trim(); }
 		return 'comment button not found';
 	`)
 	logger.Debug("[browser_comment_zhihu] step1 expand: %s", r1)
@@ -460,8 +478,19 @@ func BrowserCommentZhihu(_ context.Context, req mcp.CallToolRequest) (*mcp.CallT
 		return mcp.NewToolResultError(fmt.Sprintf("step1 failed: %v", err)), nil
 	}
 
-	// Wait for comment section to expand
-	time.Sleep(800 * time.Millisecond)
+	// Wait for the Draft.js editor to appear (poll up to 3s)
+	var editorReady bool
+	for range 15 {
+		time.Sleep(200 * time.Millisecond)
+		check, _ := browser.ExecuteJS(page, `document.querySelector('.public-DraftEditor-content') ? 'yes' : 'no'`)
+		if check == "yes" {
+			editorReady = true
+			break
+		}
+	}
+	if !editorReady {
+		return mcp.NewToolResultError(fmt.Sprintf("editor did not appear after clicking comment button (step1=%s)", r1)), nil
+	}
 
 	// Step 2: insert text into Draft.js editor via ClipboardEvent paste.
 	// execCommand('insertText') inserts DOM text but does NOT update Draft.js's internal
