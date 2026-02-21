@@ -1,0 +1,7 @@
+dist/
+.git/
+.env
+.feishu.env
+*.db
+docs/
+bundled-skills/

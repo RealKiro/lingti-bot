@@ -59,6 +59,16 @@ type MCPServerConfig struct {
 	URL     string   `yaml:"url,omitempty"`
 }
 
+// AIOverride allows per-platform or per-channel AI provider settings.
+type AIOverride struct {
+	Platform  string `yaml:"platform,omitempty"`   // e.g. "telegram", "discord"
+	ChannelID string `yaml:"channel_id,omitempty"` // optional: specific channel
+	Provider  string `yaml:"provider,omitempty"`
+	APIKey    string `yaml:"api_key,omitempty"`
+	BaseURL   string `yaml:"base_url,omitempty"`
+	Model     string `yaml:"model,omitempty"`
+}
+
 type AIConfig struct {
 	Provider   string            `yaml:"provider,omitempty"`
 	APIKey     string            `yaml:"api_key,omitempty"`
@@ -66,6 +76,42 @@ type AIConfig struct {
 	Model      string            `yaml:"model,omitempty"`
 	MaxRounds  int               `yaml:"max_rounds,omitempty"`
 	MCPServers []MCPServerConfig `yaml:"mcp_servers,omitempty"`
+	Overrides  []AIOverride      `yaml:"overrides,omitempty"`
+}
+
+// ResolveAI returns the AI settings for a given platform and channel,
+// checking overrides from most specific (platform+channel) to least (platform only).
+func (c *Config) ResolveAI(platform, channelID string) AIConfig {
+	base := c.AI
+	// Check for channel-specific override first, then platform-only
+	for _, o := range c.AI.Overrides {
+		if o.Platform == platform && o.ChannelID != "" && o.ChannelID == channelID {
+			return applyOverride(base, o)
+		}
+	}
+	for _, o := range c.AI.Overrides {
+		if o.Platform == platform && o.ChannelID == "" {
+			return applyOverride(base, o)
+		}
+	}
+	return base
+}
+
+func applyOverride(base AIConfig, o AIOverride) AIConfig {
+	if o.Provider != "" {
+		base.Provider = o.Provider
+	}
+	if o.APIKey != "" {
+		base.APIKey = o.APIKey
+	}
+	if o.BaseURL != "" {
+		base.BaseURL = o.BaseURL
+	}
+	if o.Model != "" {
+		base.Model = o.Model
+	}
+	base.Overrides = nil // don't propagate
+	return base
 }
 
 type PlatformConfig struct {

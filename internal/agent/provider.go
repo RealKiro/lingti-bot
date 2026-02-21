@@ -23,6 +23,9 @@ type ChatRequest struct {
 	// ForceToolUse, when true, sets tool_choice="required" so the model must call a tool.
 	// Use this during multi-step browser tasks to prevent premature stop responses.
 	ForceToolUse bool
+	// ThinkingBudget, when > 0, enables Claude extended thinking with the given token budget.
+	// Only used by the Claude provider; other providers ignore this.
+	ThinkingBudget int
 }
 
 // ChatResponse represents a chat completion response

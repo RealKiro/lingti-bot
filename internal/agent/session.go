@@ -83,6 +83,21 @@ func (s *SessionStore) Clear(key string) {
 	delete(s.settings, key)
 }
 
+// ThinkingBudgetTokens returns the token budget for Claude extended thinking.
+// Returns 0 for non-thinking levels.
+func ThinkingBudgetTokens(level ThinkingLevel) int {
+	switch level {
+	case ThinkLow:
+		return 1024
+	case ThinkMedium:
+		return 4096
+	case ThinkHigh:
+		return 16384
+	default:
+		return 0
+	}
+}
+
 // ThinkingPrompt returns the thinking instruction based on level
 func ThinkingPrompt(level ThinkingLevel) string {
 	switch level {

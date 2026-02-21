@@ -20,7 +20,10 @@
 - 🛠️ **75+ MCP 工具** — 覆盖文件、Shell、系统、网络、日历、Git、GitHub 等全场景
 - 🌏 **中国平台原生支持** — 钉钉、飞书、企业微信、微信公众号开箱即用
 - 🔌 **嵌入式友好** — 可编译到 ARM/MIPS，轻松部署到树莓派、路由器、NAS
-- 🧠 **多 AI 后端** — 集成 Claude、DeepSeek、Kimi、MiniMax、Gemini 等 [16 种 AI 服务](docs/ai-providers.md)，按需切换
+- 🧠 **多 AI 后端** — 集成 Claude、DeepSeek、Kimi、MiniMax、Gemini 等 [16 种 AI 服务](docs/ai-providers.md)，按需切换，支持[按平台/频道指定不同模型](#per-channel-model)
+- 🔬 **Claude 深度思考** — 原生支持 Claude Extended Thinking API，`/think high` 即可启用真正的链式推理
+- 🐳 **Docker 部署** — 提供 Dockerfile 和 docker-compose.yml，一键容器化部署
+- 🩺 **健康诊断** — `lingti-bot doctor` 一键检查配置、连接、依赖，快速定位问题
 
 支持企业微信、飞书、钉钉、Slack、Telegram、Discord、WhatsApp、LINE、Teams 等 [19 种聊天平台](docs/chat-platforms.md) 接入，既可通过**云中继 5 分钟秒接**，也可 [OpenClaw](docs/openclaw-reference.md) 式**传统自建部署**。查看 [开发路线图](docs/roadmap.md) 了解更多功能规划。
 
@@ -185,6 +188,10 @@ browser_screenshot path="/tmp/zhihu-result.png"
 | **安装大小** | ~15MB 单文件 | 100MB+ (含 node_modules) |
 | **输出风格** | 纯文本，无彩色 | 彩色输出 |
 | **设计哲学** | 极简主义，够用就好 | 功能丰富，灵活优先 |
+| **Docker 部署** | ✅ 多阶段构建，~15MB 镜像 | ✅ Docker 支持 |
+| **Extended Thinking** | ✅ Claude 原生 API | ✅ 支持 |
+| **按平台模型切换** | ✅ 配置文件声明式 | ✅ 支持 |
+| **健康诊断** | ✅ `doctor` 命令 | ✅ 支持 |
 | **中国平台** | 原生支持飞书/企微/钉钉 | 需自行集成 |
 | **云中继** | ✅ 免自建服务器，秒级接入微信/企微 | ❌ 需自建 Web 服务 |
 
@@ -219,7 +226,7 @@ make build
 ./dist/lingti-bot serve
 ```
 
-无需 Docker，无需数据库，无需云服务。
+无需数据库，无需云服务。也支持 [Docker 部署](#docker-部署)。
 
 ### 本地优先
 
@@ -351,6 +358,90 @@ make build
 | **多 AI 后端** | [16 种 AI 服务](docs/ai-providers.md)按需切换 |
 | **对话管理** | `/new`、`/reset`、`新对话` 命令重置对话 |
 
+### 健康诊断 — 一键排查配置问题
+
+```bash
+lingti-bot doctor
+```
+
+```
+lingti-bot doctor
+=================
+OS: darwin/arm64, Go: go1.24.0
+
+Checks:
+  ✓ Config file (~/.lingti.yaml) — loaded
+  ✓ AI API key — set (sk-ant-a..., provider: claude)
+  ✓ AI provider connectivity — reachable (HTTP 200)
+  ✓ Platform credentials — wecom, telegram
+  ✓ Binary: gh — found
+  ✗ Binary: chrome — not found in PATH
+  ✓ Binary: claude — found
+  ✓ MCP server: chrome — command "npx" available
+  ✓ Temp directory — writable
+
+8 passed, 1 failed
+```
+
+检查项包括：配置文件、API 密钥、AI 连接、平台凭证、必需工具、CDP 连接、MCP 服务器、磁盘空间。
+
+### <a id="per-channel-model"></a>按平台/频道模型切换
+
+为不同平台或频道配置不同的 AI 模型，在 `~/.lingti.yaml` 中声明：
+
+```yaml
+ai:
+  provider: deepseek
+  api_key: sk-xxx
+  model: deepseek-chat
+
+  # 按平台/频道覆盖
+  overrides:
+    - platform: telegram
+      provider: claude
+      api_key: sk-ant-xxx
+      model: claude-sonnet-4-20250514
+    - platform: discord
+      provider: openai
+      api_key: sk-xxx
+      model: gpt-4o
+    - platform: slack
+      channel_id: C12345
+      provider: claude
+      api_key: sk-ant-xxx
+```
+
+匹配规则：先匹配 `platform + channel_id`（精确），再匹配 `platform`（宽泛），最后使用默认配置。
+
+### Claude 深度思考 — 原生 Extended Thinking API
+
+对 Claude 模型启用真正的链式推理（非提示词模拟），通过会话命令切换：
+
+| 命令 | 模式 | 思考 Token 预算 |
+|------|------|-----------------|
+| `/think off` | 关闭 | 0 |
+| `/think low` | 简单 | 1,024 |
+| `/think medium` | 中等（默认） | 4,096 |
+| `/think high` | 深度 | 16,384 |
+
+- **Claude 模型**：自动使用 Anthropic Thinking API，模型在回复前进行真正的内部推理
+- **其他模型**：降级为系统提示词引导的思考模式
+
+### Docker 部署
+
+```bash
+# 构建镜像
+docker build -t lingti-bot .
+
+# 运行
+docker run -e AI_API_KEY=sk-xxx -e TELEGRAM_BOT_TOKEN=xxx lingti-bot
+
+# 使用 docker-compose（推荐）
+docker compose up -d
+```
+
+`docker-compose.yml` 支持配置文件挂载、环境变量注入，以及可选的 Chrome 容器用于浏览器自动化。
+
 ### 语音交互 — 解放双手，畅快对话
 
 支持语音输入和语音输出，实现真正的免提 AI 交互体验。
@@ -395,8 +486,11 @@ lingti-bot skills info github
 | **多平台消息网关** | [19 种聊天平台](docs/chat-platforms.md) | 微信公众号、企业微信、Slack、飞书一键接入，支持云中继 |
 | **MCP 工具集** | 75+ 本地系统工具 | 文件、Shell、系统、网络、日历、Git、GitHub 等全覆盖 |
 | **Skills** | 模块化能力扩展 | 8 个内置 Skill，支持自定义和项目级扩展 |
-| **智能对话** | 多轮对话与记忆 | 上下文记忆、[16 种 AI 后端](docs/ai-providers.md) |
+| **智能对话** | 多轮对话与记忆 | 上下文记忆、[16 种 AI 后端](docs/ai-providers.md)、按平台模型切换 |
+| **深度思考** | Claude Extended Thinking | 原生 Thinking API，4 级思考深度 |
 | **语音交互** | 语音输入/输出 | 本地 whisper-cpp、OpenAI、ElevenLabs 多引擎支持 |
+| **健康诊断** | `doctor` 命令 | 一键检查配置、连接、依赖 |
+| **Docker 部署** | 容器化 | 多阶段构建，docker-compose 支持 |
 
 ## 云中继：零门槛接入企业消息平台
 
@@ -1125,11 +1219,14 @@ make build  # 或: make darwin-arm64 / make linux-amd64
 lingti-bot/
 ├── main.go                 # 程序入口
 ├── Makefile                # 构建脚本
+├── Dockerfile              # 多阶段 Docker 构建
+├── docker-compose.yml      # 容器编排
 ├── go.mod                  # Go 模块定义
 │
 ├── cmd/                    # 命令行接口
 │   ├── root.go             # 根命令
 │   ├── serve.go            # MCP 服务器命令
+│   ├── doctor.go           # 健康诊断命令
 │   ├── service.go          # 系统服务管理
 │   └── version.go          # 版本信息
 │
@@ -1170,7 +1267,12 @@ lingti-bot/
 │   │       └── feishu.go   # 飞书 WebSocket
 │   │
 │   ├── agent/
-│   │   ├── tools.go        # Agent 工具执行
+│   │   ├── agent.go        # Agent 主逻辑与工具定义
+│   │   ├── pool.go         # Agent 连接池（按平台模型切换）
+│   │   ├── provider.go     # AI Provider 接口
+│   │   ├── provider_claude.go  # Claude 实现（含 Extended Thinking）
+│   │   ├── session.go      # 会话设置（思考级别）
+│   │   ├── tools.go        # 工具执行
 │   │   └── memory.go       # 会话记忆
 │   │
 │   └── service/

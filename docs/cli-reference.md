@@ -7,6 +7,7 @@ Complete command line reference for lingti-bot.
 - [Global Options](#global-options)
 - [Commands](#commands)
   - [serve](#serve) - Start MCP server
+  - [doctor](#doctor) - Check system health
   - [router](#router) - Start message router
   - [gateway](#gateway) - Start WebSocket gateway
   - [voice](#voice) - Voice input mode
@@ -88,6 +89,51 @@ lingti-bot serve
     }
   }
 }
+```
+
+---
+
+### doctor
+
+Run diagnostic checks on configuration, credentials, connectivity, and required tools.
+
+```bash
+lingti-bot doctor
+```
+
+**Checks performed:**
+
+| Check | Description |
+|-------|-------------|
+| Config file | `~/.lingti.yaml` exists and parses correctly |
+| AI API key | Set via env var or config, valid format |
+| AI connectivity | Test connection to AI provider API |
+| Platform credentials | List which platforms have tokens configured |
+| Required binaries | `gh`, `chrome`, `claude` available in PATH |
+| Browser CDP | Connection to Chrome DevTools if `cdp_url` is set |
+| MCP servers | External MCP server commands/URLs reachable |
+| Temp directory | `/tmp` is writable |
+
+**Output:** Colored checklist with ✓/✗ per check. Exit code 1 if any check fails.
+
+**Example:**
+
+```
+lingti-bot doctor
+=================
+OS: darwin/arm64, Go: go1.24.0
+
+Checks:
+  ✓ Config file (~/.lingti.yaml) — loaded
+  ✓ AI API key — set (sk-ant-a..., provider: claude)
+  ✓ AI provider connectivity — reachable (HTTP 200)
+  ✓ Platform credentials — wecom, telegram
+  ✓ Binary: gh — found
+  ✗ Binary: chrome — not found in PATH
+  ✓ Binary: claude — found
+  ✓ Temp directory — writable
+
+7 passed, 1 failed
 ```
 
 ---
@@ -568,6 +614,23 @@ lingti-bot voice \
   --ai-provider claude \
   --api-key $ANTHROPIC_API_KEY \
   --speak
+```
+
+### Docker Deployment
+
+```bash
+# Build the image
+docker build -t lingti-bot .
+
+# Run with environment variables
+docker run -e AI_API_KEY=sk-xxx -e TELEGRAM_BOT_TOKEN=xxx lingti-bot
+
+# Using docker-compose (recommended)
+AI_API_KEY=sk-xxx docker compose up -d
+
+# Mount config file for overrides and advanced settings
+docker run -v ~/.lingti.yaml:/root/.lingti.yaml:ro \
+  -e AI_API_KEY=sk-xxx lingti-bot router
 ```
 
 ### Docker / Headless Server

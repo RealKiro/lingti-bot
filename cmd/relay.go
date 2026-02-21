@@ -328,7 +328,7 @@ func runRelay(cmd *cobra.Command, args []string) {
 	}
 
 	// Create the AI agent
-	aiAgent, err := agent.New(agent.Config{
+	agentCfg := agent.Config{
 		Provider:           relayAIProvider,
 		APIKey:             relayAPIKey,
 		BaseURL:            relayBaseURL,
@@ -338,7 +338,8 @@ func runRelay(cmd *cobra.Command, args []string) {
 		DisableFileTools:   loadDisableFileTools(),
 		MaxToolRounds:      relayMaxRounds,
 		MCPServers:         mcpServers,
-	})
+	}
+	aiAgent, err := agent.New(agentCfg)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error creating agent: %v\n", err)
 		os.Exit(1)
@@ -361,8 +362,12 @@ func runRelay(cmd *cobra.Command, args []string) {
 		}
 	}
 
-	// Create the router with the agent as message handler
-	r := router.New(aiAgent.HandleMessage)
+	// Create agent pool for per-platform/channel model overrides
+	savedCfgForPool, _ := config.Load()
+	pool := agent.NewAgentPool(aiAgent, agentCfg, savedCfgForPool)
+
+	// Create the router with the pool as message handler
+	r := router.New(pool.HandleMessage)
 
 	// Initialize cron scheduler
 	homeDir, err := os.UserHomeDir()

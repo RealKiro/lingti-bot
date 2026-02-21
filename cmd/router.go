@@ -539,7 +539,7 @@ func runRouter(cmd *cobra.Command, args []string) {
 	}
 
 	// Create the AI agent
-	aiAgent, err := agent.New(agent.Config{
+	agentCfg := agent.Config{
 		Provider:           aiProvider,
 		APIKey:             aiAPIKey,
 		BaseURL:            aiBaseURL,
@@ -548,7 +548,8 @@ func runRouter(cmd *cobra.Command, args []string) {
 		CustomInstructions: customInstructions,
 		AllowedPaths:       loadAllowedPaths(),
 		DisableFileTools:   loadDisableFileTools(),
-	})
+	}
+	aiAgent, err := agent.New(agentCfg)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error creating agent: %v\n", err)
 		os.Exit(1)
@@ -556,7 +557,6 @@ func runRouter(cmd *cobra.Command, args []string) {
 
 	// Configure browser debug mode if enabled
 	if debugEnabled {
-		// Import is needed at the top: "github.com/pltanton/lingti-bot/internal/browser"
 		if err := setupBrowserDebug(browserDebugDir); err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: Failed to setup browser debug: %v\n", err)
 		} else {
@@ -564,8 +564,12 @@ func runRouter(cmd *cobra.Command, args []string) {
 		}
 	}
 
-	// Create the router with the agent as message handler
-	r := router.New(aiAgent.HandleMessage)
+	// Create agent pool for per-platform/channel model overrides
+	savedCfgForPool, _ := config.Load()
+	pool := agent.NewAgentPool(aiAgent, agentCfg, savedCfgForPool)
+
+	// Create the router with the pool as message handler
+	r := router.New(pool.HandleMessage)
 
 	// Initialize cron scheduler
 	homeDir, err := os.UserHomeDir()

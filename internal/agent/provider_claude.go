@@ -198,12 +198,30 @@ func (p *ClaudeProvider) Chat(ctx context.Context, req ChatRequest) (ChatRespons
 		maxTokens = 4096
 	}
 
+	// Enable extended thinking if requested
+	if req.ThinkingBudget > 0 {
+		// When thinking is enabled, MaxTokens must be > BudgetTokens
+		minMax := req.ThinkingBudget + 4096
+		if maxTokens < minMax {
+			maxTokens = minMax
+		}
+	}
+
 	// Build request
 	apiReq := anthropic.MessagesRequest{
 		Model:     anthropic.Model(p.model),
 		MaxTokens: maxTokens,
 		Messages:  messages,
 		Tools:     tools,
+	}
+
+	// Set extended thinking
+	if req.ThinkingBudget > 0 {
+		apiReq.Thinking = &anthropic.Thinking{
+			Type:         anthropic.ThinkingTypeEnabled,
+			BudgetTokens: req.ThinkingBudget,
+		}
+		logger.Info("[Claude] Extended thinking enabled (budget: %d tokens, max: %d)", req.ThinkingBudget, maxTokens)
 	}
 
 	// For OAuth tokens, send system prompt as array with Claude Code identity as first block

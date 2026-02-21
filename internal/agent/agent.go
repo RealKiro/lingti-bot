@@ -366,7 +366,15 @@ func (a *Agent) HandleMessage(ctx context.Context, msg router.Message) (router.R
 
 	// Get session settings
 	settings := a.sessions.Get(convKey)
-	thinkingPrompt := ThinkingPrompt(settings.ThinkingLevel)
+
+	// For Claude provider, use real extended thinking API; for others, use prompt-based
+	var thinkingPrompt string
+	var thinkingBudget int
+	if a.provider.Name() == "claude" {
+		thinkingBudget = ThinkingBudgetTokens(settings.ThinkingLevel)
+	} else {
+		thinkingPrompt = ThinkingPrompt(settings.ThinkingLevel)
+	}
 
 	// Auto-approval mode notice
 	autoApprovalNotice := ""
@@ -552,10 +560,11 @@ Current date: %s%s%s`, autoApprovalNotice, runtime.GOOS, runtime.GOARCH, homeDir
 
 	// Call AI provider
 	resp, err := a.provider.Chat(ctx, ChatRequest{
-		Messages:     messages,
-		SystemPrompt: systemPrompt,
-		Tools:        tools,
-		MaxTokens:    4096,
+		Messages:       messages,
+		SystemPrompt:   systemPrompt,
+		Tools:          tools,
+		MaxTokens:      4096,
+		ThinkingBudget: thinkingBudget,
 	})
 	if err != nil {
 		return router.Response{}, fmt.Errorf("AI error: %w", err)
@@ -632,11 +641,12 @@ Current date: %s%s%s`, autoApprovalNotice, runtime.GOOS, runtime.GOARCH, homeDir
 		logger.Info("[Agent] Calling AI (round %d/%d, forceToolUse=%v, user: %s)", round+2, maxToolRounds, hasBrowserTool, msg.Username)
 		callCtx, callCancel := context.WithTimeout(ctx, 60*time.Second)
 		resp, err = a.provider.Chat(callCtx, ChatRequest{
-			Messages:     messages,
-			SystemPrompt: systemPrompt,
-			Tools:        tools,
-			MaxTokens:    4096,
-			ForceToolUse: hasBrowserTool,
+			Messages:       messages,
+			SystemPrompt:   systemPrompt,
+			Tools:          tools,
+			MaxTokens:      4096,
+			ForceToolUse:   hasBrowserTool,
+			ThinkingBudget: thinkingBudget,
 		})
 		callCancel()
 		if err != nil {

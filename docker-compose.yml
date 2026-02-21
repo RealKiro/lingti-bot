@@ -1,0 +1,33 @@
+services:
+  lingti-bot:
+    build: .
+    restart: unless-stopped
+    volumes:
+      - ${HOME}/.lingti.yaml:/root/.lingti.yaml:ro
+      - lingti-data:/root/.lingti
+    environment:
+      - AI_PROVIDER=${AI_PROVIDER:-claude}
+      - AI_API_KEY=${AI_API_KEY}
+      - AI_BASE_URL=${AI_BASE_URL:-}
+      - AI_MODEL=${AI_MODEL:-}
+      - SLACK_BOT_TOKEN=${SLACK_BOT_TOKEN:-}
+      - SLACK_APP_TOKEN=${SLACK_APP_TOKEN:-}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+      - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN:-}
+      - FEISHU_APP_ID=${FEISHU_APP_ID:-}
+      - FEISHU_APP_SECRET=${FEISHU_APP_SECRET:-}
+      - DINGTALK_CLIENT_ID=${DINGTALK_CLIENT_ID:-}
+      - DINGTALK_CLIENT_SECRET=${DINGTALK_CLIENT_SECRET:-}
+    command: ["router"]
+
+  # Optional: Chrome for browser automation
+  # Uncomment to enable browser_* tools inside Docker
+  # chrome:
+  #   image: zenika/alpine-chrome:latest
+  #   restart: unless-stopped
+  #   command: ["--no-sandbox", "--remote-debugging-address=0.0.0.0", "--remote-debugging-port=9222"]
+  #   ports:
+  #     - "9222:9222"
+
+volumes:
+  lingti-data:

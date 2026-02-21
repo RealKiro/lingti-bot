@@ -75,7 +75,7 @@
 | 多模型支持 | ✅ | ✅ | 已实现 |
 | 对话记忆 | ✅ | ✅ | 已实现 |
 | 模型 Failover | ❌ | ✅ | 待开发 |
-| Extended Thinking | ❌ | ✅ | 待开发 |
+| Extended Thinking | ✅ | ✅ | 已实现（Claude 原生 API）|
 | Agent 间通信 | ❌ | ✅ | 待开发 |
 | 持久化记忆 (RAG) | ❌ | ✅ | 待开发 |
 
@@ -106,7 +106,10 @@
 ### 中优先级
 
 - [ ] macOS 菜单栏应用 — SwiftUI 原生应用
-- [ ] Extended Thinking — 支持 Claude 深度思考模式
+- [x] Extended Thinking — 支持 Claude 深度思考模式（原生 Thinking API）
+- [x] 按平台/频道模型切换 — AI overrides 配置
+- [x] `doctor` 健康诊断命令
+- [x] Docker 部署 — Dockerfile + docker-compose.yml
 - [ ] DM 配对验证 — 未知发送者需验证码配对
 - [ ] 持久化记忆 (RAG) — 跨会话知识库
 
@@ -117,7 +120,7 @@
 - [ ] Notion / Obsidian / Trello 集成
 - [ ] iOS / Android 原生应用
 - [ ] Live Canvas — Agent 驱动的可视化画布
-- [ ] Docker 沙箱 — 隔离执行环境
+- [x] Docker 部署 — Dockerfile + docker-compose.yml
 - [ ] Agent 间通信 — 多 Agent 协作
 - [ ] 技能注册中心 — 类似 ClawHub 的技能市场
 

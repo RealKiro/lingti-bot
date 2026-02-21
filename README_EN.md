@@ -19,7 +19,10 @@ English | [中文](./README.md)
 - 🛠️ **75+ MCP Tools** — Covers files, Shell, system, network, calendar, Git, GitHub, and more
 - 🌏 **China Platform Native** — DingTalk, Feishu, WeCom, WeChat Official Account ready out-of-box
 - 🔌 **Embedded Friendly** — Compile to ARM/MIPS, easy deployment to Raspberry Pi, routers, NAS
-- 🧠 **Multi-AI Backend** — [15 AI providers](docs/ai-providers.md) including Claude, DeepSeek, Kimi, MiniMax, Gemini, OpenAI, and more
+- 🧠 **Multi-AI Backend** — [16 AI providers](docs/ai-providers.md) including Claude, DeepSeek, Kimi, MiniMax, Gemini, OpenAI, with per-platform/channel model overrides
+- 🔬 **Claude Extended Thinking** — Native Anthropic Thinking API support, real chain-of-thought reasoning via `/think high`
+- 🐳 **Docker Support** — Multi-stage Dockerfile and docker-compose.yml for containerized deployment
+- 🩺 **Health Diagnostics** — `lingti-bot doctor` checks config, connectivity, dependencies in one command
 
 Supports WeCom, Feishu, DingTalk, Slack, Telegram, Discord, WhatsApp, LINE, Teams, and more — [19 chat platforms](docs/chat-platforms.md) in total. Either **5-minute cloud relay** or [OpenClaw](docs/openclaw-reference.md)-style **self-hosted deployment**. Check [Roadmap](docs/roadmap.md) for more features.
 

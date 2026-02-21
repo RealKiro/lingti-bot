@@ -51,6 +51,22 @@ ai:
   model: ""          # 自定义模型名（可选，留空使用 provider 默认值）
   max_rounds: 100    # 每条消息最多工具调用轮次（默认 100）
 
+  # 按平台/频道覆盖 AI 设置（可选）
+  # 匹配优先级：platform + channel_id > platform > 默认
+  overrides:
+    - platform: telegram        # 平台名（必填）
+      provider: claude          # 覆盖 provider
+      api_key: sk-ant-xxx       # 覆盖 api_key
+      model: claude-sonnet-4-20250514
+    - platform: slack
+      channel_id: C12345        # 可选：指定频道
+      provider: openai
+      api_key: sk-xxx
+      model: gpt-4o
+    # - platform: discord
+    #   provider: gemini
+    #   api_key: xxx
+
   # 外部 MCP 服务器（可选）：bot 启动时自动连接并将其工具暴露给 AI
   # 工具名称格式：mcp_<name>_<tool_name>
   mcp_servers:
@@ -193,10 +209,21 @@ lingti-bot relay           # 之后无需任何参数
 lingti-bot relay --provider qwen --model qwen-plus
 ```
 
-### 容器部署：环境变量
+### 容器部署：Docker Compose
 
 ```bash
-docker run -e AI_PROVIDER=deepseek -e AI_API_KEY=sk-xxx lingti-bot relay
+# 使用 docker-compose（推荐）
+AI_API_KEY=sk-xxx TELEGRAM_BOT_TOKEN=xxx docker compose up -d
+
+# 或直接 docker run
+docker run -e AI_PROVIDER=deepseek -e AI_API_KEY=sk-xxx lingti-bot router
+```
+
+挂载配置文件以使用 overrides 和其他高级功能：
+
+```bash
+docker run -v ~/.lingti.yaml:/root/.lingti.yaml:ro \
+  -e AI_API_KEY=sk-xxx lingti-bot router
 ```
 
 ### 多实例运行：命令行参数覆盖
