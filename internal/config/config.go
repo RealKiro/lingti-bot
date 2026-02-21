@@ -98,8 +98,12 @@ func (c *Config) ResolveAI(platform, channelID string) AIConfig {
 }
 
 func applyOverride(base AIConfig, o AIOverride) AIConfig {
-	if o.Provider != "" {
+	if o.Provider != "" && o.Provider != base.Provider {
+		// Provider changed — clear base_url and model so the new provider's
+		// defaults are used (e.g. don't pass deepseek's base_url to kimi).
 		base.Provider = o.Provider
+		base.BaseURL = ""
+		base.Model = ""
 	}
 	if o.APIKey != "" {
 		base.APIKey = o.APIKey
