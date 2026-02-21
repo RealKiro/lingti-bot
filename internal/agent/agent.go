@@ -559,11 +559,13 @@ Current date: %s%s%s`, autoApprovalNotice, runtime.GOOS, runtime.GOARCH, homeDir
 			if count > 1 {
 				logger.Warn("[Agent] Tool %s called %d times (round %d/%d, user: %s)", tc.Name, count, round+1, maxToolRounds, msg.Username)
 			}
-			if count == 4 && strings.HasPrefix(tc.Name, "browser_") {
+			if count >= 3 && strings.HasPrefix(tc.Name, "browser_") {
 				stallHint = fmt.Sprintf(
-					"\n\n[SYSTEM HINT] You have called %s %d times without completing the task. "+
-						"Try a different approach: use browser_execute_js to inspect the page structure, "+
-						"scroll to reveal hidden elements, or look for a different UI element to interact with.",
+					"\n\n[SYSTEM HINT] You have called %s %d times. If you are trying to post a comment on Zhihu, "+
+						"STOP clicking and use browser_execute_js instead. Run this script to type and submit the comment:\n"+
+						"script: \"var btn = Array.from(document.querySelectorAll('button,span')).find(e=>e.textContent.includes('评论')); if(btn){btn.click();} return 'clicked comment btn';\" "+
+						"Then after 1s: script: \"var ta = document.querySelector('.CommentInput textarea, textarea'); if(ta){ta.focus();ta.value='YOUR_COMMENT';ta.dispatchEvent(new Event('input',{bubbles:true}));return 'typed';} return 'no textarea found';\" "+
+						"Then find and click the 发布 submit button.",
 					tc.Name, count,
 				)
 			}
