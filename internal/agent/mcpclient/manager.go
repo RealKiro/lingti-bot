@@ -185,6 +185,9 @@ func (s *serverConn) call(ctx context.Context, toolName string, args map[string]
 
 	req := mcp.CallToolRequest{}
 	req.Params.Name = toolName
+	if args == nil {
+		args = map[string]any{}
+	}
 	req.Params.Arguments = args
 
 	result, err := s.client.CallTool(ctx, req)

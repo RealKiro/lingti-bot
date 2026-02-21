@@ -1479,6 +1479,12 @@ func (a *Agent) callToolDirect(ctx context.Context, name string, args map[string
 		if err != nil {
 			return "Error: " + err.Error()
 		}
+		// Truncate large results (e.g. accessibility tree snapshots) to avoid
+		// overflowing the model's context window.
+		const mcpMaxLen = 8000
+		if len(result) > mcpMaxLen {
+			result = result[:mcpMaxLen] + fmt.Sprintf("\n... (truncated, total %d chars)", len(result))
+		}
 		return result
 	}
 	switch name {
