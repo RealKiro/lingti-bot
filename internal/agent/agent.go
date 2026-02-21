@@ -45,7 +45,7 @@ type Config struct {
 
 // New creates a new Agent with the specified provider
 func New(cfg Config) (*Agent, error) {
-	if cfg.APIKey == "" {
+	if cfg.APIKey == "" && strings.ToLower(cfg.Provider) != "ollama" {
 		return nil, fmt.Errorf("API key is required")
 	}
 
@@ -82,6 +82,7 @@ var openaiCompatProviders = map[string]struct {
 	"baichuan":   {"https://api.baichuan-ai.com/v1", "Baichuan4"},
 	"spark":      {"https://spark-api-open.xf-yun.com/v1", "generalv3.5"},
 	"hunyuan":    {"https://api.hunyuan.cloud.tencent.com/v1", "hunyuan-turbos-latest"},
+	"ollama":     {"http://localhost:11434/v1", "llama3.2"},
 }
 
 // openaiCompatAliases maps alternative names to canonical provider names.
@@ -147,7 +148,7 @@ func createProvider(cfg Config) (Provider, error) {
 				DefaultModel: defaults.model,
 			})
 		}
-		return nil, fmt.Errorf("unknown provider: %s (supported: claude, deepseek, kimi, qwen, minimax, doubao, zhipu, openai, gemini, yi, stepfun, siliconflow, grok, baichuan, spark, hunyuan)", cfg.Provider)
+		return nil, fmt.Errorf("unknown provider: %s (supported: claude, deepseek, kimi, qwen, minimax, doubao, zhipu, openai, gemini, yi, stepfun, siliconflow, grok, baichuan, spark, hunyuan, ollama)", cfg.Provider)
 	}
 }
 

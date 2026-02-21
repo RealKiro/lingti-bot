@@ -28,8 +28,9 @@ type OpenAICompatConfig struct {
 
 // NewOpenAICompatProvider creates a new OpenAI-compatible provider
 func NewOpenAICompatProvider(cfg OpenAICompatConfig) (*OpenAICompatProvider, error) {
-	if cfg.APIKey == "" {
-		return nil, fmt.Errorf("API key is required")
+	apiKey := cfg.APIKey
+	if apiKey == "" {
+		apiKey = "ollama" // dummy token for local providers that don't require auth
 	}
 
 	if cfg.Model == "" {
@@ -41,7 +42,7 @@ func NewOpenAICompatProvider(cfg OpenAICompatConfig) (*OpenAICompatProvider, err
 		baseURL = cfg.DefaultURL
 	}
 
-	config := openai.DefaultConfig(cfg.APIKey)
+	config := openai.DefaultConfig(apiKey)
 	config.BaseURL = baseURL
 
 	return &OpenAICompatProvider{

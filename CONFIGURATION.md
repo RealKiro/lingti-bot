@@ -197,3 +197,18 @@ lingti-bot relay --platform wecom --provider deepseek --api-key sk-aaa
 # 实例 2: 飞书（不同 provider）
 lingti-bot relay --platform feishu --user-id xxx --provider claude --api-key sk-bbb
 ```
+
+### 本地模型：Ollama
+
+Ollama 在本地运行大模型，无需 API 密钥：
+
+```bash
+# 使用默认模型 (llama3.2)
+lingti-bot relay --provider ollama
+
+# 指定模型
+lingti-bot relay --provider ollama --model mistral
+
+# 连接远程 Ollama 实例
+lingti-bot relay --provider ollama --base-url http://remote-host:11434/v1
+```
