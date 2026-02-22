@@ -903,7 +903,7 @@ func BrowserTabOpen(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolRe
 		url = u
 	}
 
-	page, err := b.Rod().Page(proto.TargetCreateTarget{URL: url})
+	page, err := b.Rod().Page(proto.TargetCreateTarget{URL: url, Background: true})
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("failed to open tab: %v", err)), nil
 	}

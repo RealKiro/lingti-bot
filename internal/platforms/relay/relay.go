@@ -30,7 +30,7 @@ const (
 	writeTimeout      = 10 * time.Second
 	readTimeout       = 60 * time.Second
 	initialRetryDelay = 5 * time.Second
-	maxRetryDelay     = 5 * time.Minute
+	maxRetryDelay     = 40 * time.Second
 )
 
 // Config holds relay configuration

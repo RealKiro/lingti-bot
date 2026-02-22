@@ -125,7 +125,7 @@ func (b *Browser) Start(opts StartOptions) error {
 	b.refs = make(map[int]RefEntry)
 
 	if opts.URL != "" {
-		page, err := brow.Page(proto.TargetCreateTarget{URL: opts.URL})
+		page, err := brow.Page(proto.TargetCreateTarget{URL: opts.URL, Background: true})
 		if err != nil {
 			return fmt.Errorf("failed to open initial page: %w", err)
 		}
@@ -155,7 +155,7 @@ func (b *Browser) connectLocked(addr string, initialURL string) error {
 	b.refs = make(map[int]RefEntry)
 
 	if initialURL != "" {
-		page, err := brow.Page(proto.TargetCreateTarget{URL: initialURL})
+		page, err := brow.Page(proto.TargetCreateTarget{URL: initialURL, Background: true})
 		if err != nil {
 			return fmt.Errorf("failed to open initial page: %w", err)
 		}
@@ -299,7 +299,7 @@ func (b *Browser) ActivePage() (*rod.Page, error) {
 		return nil, fmt.Errorf("failed to get pages: %w", err)
 	}
 	if len(pages) == 0 {
-		page, err := b.browser.Page(proto.TargetCreateTarget{URL: "about:blank"})
+		page, err := b.browser.Page(proto.TargetCreateTarget{URL: "about:blank", Background: true})
 		if err != nil {
 			return nil, fmt.Errorf("failed to create page: %w", err)
 		}
@@ -327,7 +327,7 @@ func (b *Browser) NavigationPage() (*rod.Page, error) {
 	b.mu.Unlock()
 
 	if connected {
-		page, err := brow.Page(proto.TargetCreateTarget{URL: "about:blank"})
+		page, err := brow.Page(proto.TargetCreateTarget{URL: "about:blank", Background: true})
 		if err != nil {
 			return nil, fmt.Errorf("failed to open new tab: %w", err)
 		}
