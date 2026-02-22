@@ -558,6 +558,17 @@ Do NOT waste rounds — try clicking first, inspect only if it fails.
 5. Navigate back to search results and continue with next article
 This prevents re-processing articles and survives page reloads within the same session.
 
+**CRITICAL: Xiaohongshu (小红书) anti-bot protection — NEVER navigate to XHS article URLs directly.**
+XHS blocks direct URL navigation and returns 404 security pages. You MUST open articles by CLICKING on them from the search results page.
+Correct workflow:
+1. Navigate to https://www.xiaohongshu.com and search via the search box
+2. On the search results page, use browser_execute_js to click on article covers/titles:
+   function: "() => { var items = document.querySelectorAll('section.note-item a.cover'); if(items.length > INDEX) { items[INDEX].click(); return 'clicked item INDEX'; } return 'not found'; }"
+   Replace INDEX with the 0-based index of the article to open.
+3. After the article detail opens (as an overlay/modal), perform actions (comment, like)
+4. Close the overlay by pressing Escape or clicking outside, then continue with the next article
+5. NEVER use browser_navigate to go to a xiaohongshu.com/explore/... URL — it WILL fail with 404
+
 **Xiaohongshu (小红书) like/点赞:** On a note detail page, click the heart icon. Use browser_execute_js:
   function: "() => { var likeBtn = document.querySelector('.like-wrapper:not(.active), [class*=\"like\"]:not(.active)'); if(likeBtn){likeBtn.click();return 'liked';} return 'already liked or not found'; }"
 
@@ -662,17 +673,27 @@ Current date: %s%s%s`, autoApprovalNotice, runtime.GOOS, runtime.GOARCH, homeDir
 		// Force tool_choice="required" when the last round used browser tools so DeepSeek
 		// cannot return a bare text response — it must call another tool to continue.
 		// Use a per-call timeout so a stalled API call doesn't hang the agent forever.
-		logger.Info("[Agent] Calling AI (round %d/%d, forceToolUse=%v, user: %s)", round+2, maxToolRounds, hasBrowserTool, msg.Username)
-		callCtx, callCancel := context.WithTimeout(ctx, 60*time.Second)
-		resp, err = a.provider.Chat(callCtx, ChatRequest{
+		// Scale timeout with message count: 90s base + 1s per message (capped at 180s).
+		callTimeout := 90*time.Second + time.Duration(min(len(messages), 90))*time.Second
+		logger.Info("[Agent] Calling AI (round %d/%d, forceToolUse=%v, timeout=%s, user: %s)", round+2, maxToolRounds, hasBrowserTool, callTimeout, msg.Username)
+		chatReq := ChatRequest{
 			Messages:       messages,
 			SystemPrompt:   systemPrompt,
 			Tools:          tools,
 			MaxTokens:      4096,
 			ForceToolUse:   hasBrowserTool,
 			ThinkingBudget: thinkingBudget,
-		})
+		}
+		callCtx, callCancel := context.WithTimeout(ctx, callTimeout)
+		resp, err = a.provider.Chat(callCtx, chatReq)
 		callCancel()
+		// Retry once on timeout — the API may have been temporarily slow.
+		if err != nil && ctx.Err() == nil && (strings.Contains(err.Error(), "deadline exceeded") || strings.Contains(err.Error(), "context canceled")) {
+			logger.Warn("[Agent] AI call timed out (round %d), retrying once...", round+2)
+			callCtx2, callCancel2 := context.WithTimeout(ctx, callTimeout)
+			resp, err = a.provider.Chat(callCtx2, chatReq)
+			callCancel2()
+		}
 		if err != nil {
 			logger.Warn("[Agent] AI call failed (round %d, forceToolUse=%v): %v", round+2, hasBrowserTool, err)
 			// Log message count and last few messages to help diagnose what triggered the failure

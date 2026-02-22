@@ -365,7 +365,16 @@ type StatusInfo struct {
 // even when the script contains statements like forEach() that return undefined.
 // Use "return <expr>" to get a value back.
 func ExecuteJS(page *rod.Page, script string) (string, error) {
-	wrapped := fmt.Sprintf("() => { %s }", script)
+	trimmed := strings.TrimSpace(script)
+	// If the script is already a function expression (arrow or traditional),
+	// use it directly; otherwise wrap it in an arrow function.
+	var wrapped string
+	if strings.HasPrefix(trimmed, "()") || strings.HasPrefix(trimmed, "function") ||
+		strings.HasPrefix(trimmed, "(function") {
+		wrapped = trimmed
+	} else {
+		wrapped = fmt.Sprintf("() => { %s }", script)
+	}
 	result, err := page.Eval(wrapped)
 	if err != nil {
 		return "", fmt.Errorf("JS execution failed: %w", err)
