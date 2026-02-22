@@ -83,7 +83,7 @@ status:
 
 # Run tests
 test:
-	go test -v ./...
+	go test -race -count=1 ./...
 
 # Clean build artifacts
 clean:
