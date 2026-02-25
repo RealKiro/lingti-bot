@@ -31,8 +31,16 @@
 
 ## 安装
 
+### macOS / Linux / WSL
+
 ```bash
 curl -fsSL https://cli.lingti.com/install.sh | bash -s -- --bot
+```
+
+### Windows (PowerShell)
+
+```powershell
+irm https://cli.lingti.com/install.ps1 | iex
 ```
 
 安装完成后，通过交互式向导完成首次配置：
@@ -502,7 +510,10 @@ lingti-bot skills info github
 
 ```bash
 # 步骤 1: 安装
+# macOS / Linux / WSL:
 curl -fsSL https://cli.lingti.com/install.sh | bash -s -- --bot
+# Windows (PowerShell):
+irm https://cli.lingti.com/install.ps1 -OutFile install.ps1; .\install.ps1 -Bot
 
 # 步骤 2: 配置企业可信IP（应用管理 → 找到应用 → 企业可信IP → 添加 106.52.166.51）
 

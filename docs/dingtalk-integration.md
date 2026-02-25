@@ -6,7 +6,10 @@
 
 ```bash
 # 1. 安装
+# macOS / Linux / WSL:
 curl -fsSL https://cli.lingti.com/install.sh | bash -s -- --bot
+# Windows (PowerShell):
+irm https://cli.lingti.com/install.ps1 -OutFile install.ps1; .\install.ps1 -Bot
 
 # 2. 启动（使用 Stream 模式，无需公网服务器）
 export DINGTALK_CLIENT_ID="your-app-key"

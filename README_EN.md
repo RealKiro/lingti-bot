@@ -30,8 +30,16 @@ Supports WeCom, Feishu, DingTalk, Slack, Telegram, Discord, WhatsApp, LINE, Team
 
 ## Installation
 
+### macOS / Linux / WSL
+
 ```bash
 curl -fsSL https://cli.lingti.com/install.sh | bash -s -- --bot
+```
+
+### Windows (PowerShell)
+
+```powershell
+irm https://cli.lingti.com/install.ps1 | iex
 ```
 
 After installation, run the interactive setup wizard:
@@ -130,7 +138,9 @@ Core functions support macOS, Linux, Windows. macOS users can enjoy native calen
 lingti-bot is primarily an **MCP (Model Context Protocol) Server** that provides rich local tools for Claude Desktop and other MCP-compatible clients.
 
 **Quick Start:**
-1. Install lingti-bot: `curl -fsSL https://cli.lingti.com/install.sh | bash -s -- --bot`
+1. Install lingti-bot:
+   - macOS / Linux / WSL: `curl -fsSL https://cli.lingti.com/install.sh | bash -s -- --bot`
+   - Windows (PowerShell): `irm https://cli.lingti.com/install.ps1 -OutFile install.ps1; .\install.ps1 -Bot`
 2. Configure Claude Desktop MCP: `~/.config/Claude/claude_desktop_config.json`
    ```json
    {

@@ -188,8 +188,14 @@
 
 ### 步骤一：安装 lingti-bot
 
+**macOS / Linux / WSL:**
 ```bash
 curl -fsSL https://cli.lingti.com/install.sh | bash -s -- --bot
+```
+
+**Windows (PowerShell):**
+```powershell
+irm https://cli.lingti.com/install.ps1 -OutFile install.ps1; .\install.ps1 -Bot
 ```
 
 ### 步骤二：在企业微信后台创建应用

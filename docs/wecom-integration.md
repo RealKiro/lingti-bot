@@ -6,7 +6,10 @@
 
 ```bash
 # 1. 安装 lingti-bot
+# macOS / Linux / WSL:
 curl -fsSL https://cli.lingti.com/install.sh | bash -s -- --bot
+# Windows (PowerShell):
+irm https://cli.lingti.com/install.ps1 -OutFile install.ps1; .\install.ps1 -Bot
 
 # 2. 在企业微信后台创建自建应用，获取以下信息：
 #    - 企业ID (CorpID): 我的企业 → 企业信息 → 企业ID
@@ -168,7 +171,10 @@ lingti-bot relay --platform wecom
 
 ```bash
 # 1. 安装 lingti-bot
+# macOS / Linux / WSL:
 curl -fsSL https://cli.lingti.com/install.sh | bash -s -- --bot
+# Windows (PowerShell):
+irm https://cli.lingti.com/install.ps1 -OutFile install.ps1; .\install.ps1 -Bot
 
 # 2. 启动服务
 lingti-bot router \

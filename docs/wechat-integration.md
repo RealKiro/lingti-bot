@@ -18,8 +18,14 @@
 
 ### 第二步：安装 lingti-bot
 
+**macOS / Linux / WSL:**
 ```bash
 curl -fsSL https://cli.lingti.com/install.sh | bash -s -- --bot
+```
+
+**Windows (PowerShell):**
+```powershell
+irm https://cli.lingti.com/install.ps1 -OutFile install.ps1; .\install.ps1 -Bot
 ```
 
 ### 第三步：配置并启动
