@@ -356,18 +356,24 @@ func runRouter(cmd *cobra.Command, args []string) {
 	}
 
 	// Fallback to saved config file
-	if savedCfg, err := config.Load(); err == nil {
-		if aiProvider == "" {
-			aiProvider = savedCfg.AI.Provider
-		}
-		if aiAPIKey == "" {
-			aiAPIKey = savedCfg.AI.APIKey
-		}
-		if aiBaseURL == "" {
-			aiBaseURL = savedCfg.AI.BaseURL
-		}
-		if aiModel == "" {
-			aiModel = savedCfg.AI.Model
+	savedCfg, cfgErr := config.Load()
+	if cfgErr == nil {
+		// Resolve named provider
+		providerRef := aiProvider
+		resolved, found := savedCfg.ResolveProvider(providerRef)
+		if found {
+			if aiProvider == "" {
+				aiProvider = resolved.Provider
+			}
+			if aiAPIKey == "" {
+				aiAPIKey = resolved.APIKey
+			}
+			if aiBaseURL == "" {
+				aiBaseURL = resolved.BaseURL
+			}
+			if aiModel == "" {
+				aiModel = resolved.Model
+			}
 		}
 		if slackBotToken == "" {
 			slackBotToken = savedCfg.Platforms.Slack.BotToken
@@ -565,8 +571,7 @@ func runRouter(cmd *cobra.Command, args []string) {
 	}
 
 	// Create agent pool for per-platform/channel model overrides
-	savedCfgForPool, _ := config.Load()
-	pool := agent.NewAgentPool(aiAgent, agentCfg, savedCfgForPool)
+	pool := agent.NewAgentPool(aiAgent, agentCfg, savedCfg)
 
 	// Create the router with the pool as message handler
 	r := router.New(pool.HandleMessage)
@@ -900,14 +905,7 @@ func runRouter(cmd *cobra.Command, args []string) {
 	}
 	modelName := aiModel
 	if modelName == "" {
-		switch providerName {
-		case "deepseek":
-			modelName = "deepseek-chat"
-		case "kimi", "moonshot":
-			modelName = "moonshot-v1-8k"
-		default:
-			modelName = "claude-sonnet-4-20250514"
-		}
+		modelName = "(default)"
 	}
 	logger.Info("Router started. AI Provider: %s, Model: %s", providerName, modelName)
 	logger.Info("Press Ctrl+C to stop.")

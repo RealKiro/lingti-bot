@@ -37,7 +37,19 @@ func (p *AgentPool) DefaultAgent() *Agent {
 
 // HandleMessage resolves the right agent for the message and delegates.
 func (p *AgentPool) HandleMessage(ctx context.Context, msg router.Message) (router.Response, error) {
-	if p.fullCfg == nil || len(p.fullCfg.AI.Overrides) == 0 {
+	if p.fullCfg == nil {
+		return p.defaultAgent.HandleMessage(ctx, msg)
+	}
+
+	// Try named providers first (new format)
+	if len(p.fullCfg.Providers) > 0 {
+		// For now, named providers are selected at startup via relay.provider / --provider.
+		// Per-message routing by named provider can be added later.
+		return p.defaultAgent.HandleMessage(ctx, msg)
+	}
+
+	// Legacy: ai.overrides resolution
+	if len(p.fullCfg.AI.Overrides) == 0 {
 		return p.defaultAgent.HandleMessage(ctx, msg)
 	}
 

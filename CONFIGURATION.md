@@ -44,6 +44,19 @@ lingti-bot onboard
 ```yaml
 mode: relay  # "relay" 或 "router"
 
+# 推荐：命名 Provider 配置
+# 每个 provider 独立定义 api_key / base_url / model，不会互相污染
+providers:
+  my-deepseek:
+    provider: deepseek
+    api_key: sk-xxx
+    model: deepseek-chat
+  my-kimi:
+    provider: kimi
+    api_key: ak-xxx
+    model: kimi-k2.5
+
+# 旧格式（仍然支持，向后兼容）
 ai:
   provider: deepseek
   api_key: sk-xxx
@@ -51,7 +64,7 @@ ai:
   model: ""          # 自定义模型名（可选，留空使用 provider 默认值）
   max_rounds: 100    # 每条消息最多工具调用轮次（默认 100）
 
-  # 按平台/频道覆盖 AI 设置（可选）
+  # 按平台/频道覆盖 AI 设置（旧格式，可选）
   # 匹配优先级：platform + channel_id > platform > 默认
   overrides:
     - platform: telegram        # 平台名（必填）
@@ -63,9 +76,6 @@ ai:
       provider: openai
       api_key: sk-xxx
       model: gpt-4o
-    # - platform: discord
-    #   provider: gemini
-    #   api_key: xxx
 
   # 外部 MCP 服务器（可选）：bot 启动时自动连接并将其工具暴露给 AI
   # 工具名称格式：mcp_<name>_<tool_name>
@@ -78,6 +88,7 @@ ai:
 
 relay:
   platform: wecom    # "feishu", "slack", "wechat", "wecom"
+  provider: my-kimi  # 引用 providers 中的命名条目
   user_id: ""        # 从 /whoami 获取（WeCom 不需要）
 
 platforms:

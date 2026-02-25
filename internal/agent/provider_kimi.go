@@ -10,7 +10,7 @@ import (
 
 const (
 	kimiDefaultBaseURL = "https://api.moonshot.cn/v1"
-	kimiDefaultModel   = "moonshot-v1-8k"
+	kimiDefaultModel   = "kimi-k2.5"
 )
 
 // KimiProvider implements the Provider interface for Kimi (Moonshot AI)

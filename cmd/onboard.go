@@ -261,16 +261,45 @@ func hasOnboardFlags(_ *cobra.Command) bool {
 
 func applyOnboardFlags(cfg *config.Config) {
 	if onboardProvider != "" {
+		// Write to named providers map (new format)
+		entry := config.ProviderEntry{Provider: onboardProvider}
+		if onboardAPIKey != "" {
+			entry.APIKey = onboardAPIKey
+		}
+		if onboardBaseURL != "" {
+			entry.BaseURL = onboardBaseURL
+		}
+		if onboardModel != "" {
+			entry.Model = onboardModel
+		}
+		name := onboardProvider
+		if cfg.Providers == nil {
+			cfg.Providers = make(map[string]config.ProviderEntry)
+		}
+		cfg.Providers[name] = entry
+		cfg.Relay.Provider = name
+		// Also keep ai: block for backward compat
 		cfg.AI.Provider = onboardProvider
-	}
-	if onboardAPIKey != "" {
-		cfg.AI.APIKey = onboardAPIKey
-	}
-	if onboardBaseURL != "" {
-		cfg.AI.BaseURL = onboardBaseURL
-	}
-	if onboardModel != "" {
-		cfg.AI.Model = onboardModel
+		if onboardAPIKey != "" {
+			cfg.AI.APIKey = onboardAPIKey
+		}
+		if onboardBaseURL != "" {
+			cfg.AI.BaseURL = onboardBaseURL
+		}
+		if onboardModel != "" {
+			cfg.AI.Model = onboardModel
+		}
+	} else {
+		// No provider flag — just update individual ai: fields
+		if onboardAPIKey != "" {
+			cfg.AI.APIKey = onboardAPIKey
+		}
+		if onboardBaseURL != "" {
+			cfg.AI.BaseURL = onboardBaseURL
+		}
+		if onboardModel != "" {
+			cfg.AI.Model = onboardModel
+		}
 	}
 	if onboardMode != "" {
 		cfg.Mode = onboardMode
@@ -448,8 +477,17 @@ func runInteractiveWizard(cfg *config.Config) {
 	fmt.Println("  ───────────────────────────────────")
 
 	// Show existing config if present
-	if cfg.AI.Provider != "" {
-		fmt.Printf("\n  Existing config found: %s / %s\n", cfg.AI.Provider, maskKey(cfg.AI.APIKey))
+	if cfg.AI.Provider != "" || len(cfg.Providers) > 0 {
+		displayProvider := cfg.AI.Provider
+		displayKey := cfg.AI.APIKey
+		if displayProvider == "" && len(cfg.Providers) > 0 {
+			for name, e := range cfg.Providers {
+				displayProvider = name
+				displayKey = e.APIKey
+				break
+			}
+		}
+		fmt.Printf("\n  Existing config found: %s / %s\n", displayProvider, maskKey(displayKey))
 		idx := promptSelect("What would you like to do?", []string{
 			"Update existing config",
 			"Start fresh",
@@ -479,7 +517,7 @@ var providers = []providerInfo{
 	{"deepseek", "deepseek     (recommended)", "https://platform.deepseek.com/api_keys", "deepseek-chat"},
 	{"qwen", "qwen         (tongyi qianwen)", "https://bailian.console.aliyun.com/", "qwen-plus"},
 	{"claude", "claude       (Anthropic)", "https://console.anthropic.com/", "claude-sonnet-4-20250514"},
-	{"kimi", "kimi         (Moonshot)", "https://platform.moonshot.cn/", "moonshot-v1-8k"},
+	{"kimi", "kimi         (Moonshot)", "https://platform.moonshot.cn/", "kimi-k2.5"},
 	{"minimax", "minimax      (MiniMax/海螺)", "https://platform.minimaxi.com/", "MiniMax-Text-01"},
 	{"doubao", "doubao       (ByteDance/豆包)", "https://console.volcengine.com/ark", "doubao-pro-32k"},
 	{"zhipu", "zhipu        (GLM/智谱)", "https://open.bigmodel.cn/", "glm-4-flash"},
@@ -616,6 +654,18 @@ func stepAIProvider(cfg *config.Config) {
 
 	model := promptText("Model", p.defModel)
 	cfg.AI.Model = model
+
+	// Also write to named providers map
+	if cfg.Providers == nil {
+		cfg.Providers = make(map[string]config.ProviderEntry)
+	}
+	cfg.Providers[p.name] = config.ProviderEntry{
+		Provider: cfg.AI.Provider,
+		APIKey:   cfg.AI.APIKey,
+		BaseURL:  cfg.AI.BaseURL,
+		Model:    cfg.AI.Model,
+	}
+	cfg.Relay.Provider = p.name
 
 	fmt.Printf("\n  > AI provider configured: %s / %s\n", cfg.AI.Provider, cfg.AI.Model)
 }

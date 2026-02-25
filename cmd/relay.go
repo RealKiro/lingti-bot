@@ -199,18 +199,24 @@ func runRelay(cmd *cobra.Command, args []string) {
 	}
 
 	// Fallback to saved config file
-	if savedCfg, err := config.Load(); err == nil {
-		if relayAIProvider == "" {
-			relayAIProvider = savedCfg.AI.Provider
-		}
-		if relayAPIKey == "" {
-			relayAPIKey = savedCfg.AI.APIKey
-		}
-		if relayBaseURL == "" {
-			relayBaseURL = savedCfg.AI.BaseURL
-		}
-		if relayModel == "" {
-			relayModel = savedCfg.AI.Model
+	savedCfg, cfgErr := config.Load()
+	if cfgErr == nil {
+		// Resolve named provider: CLI --provider > env > relay.provider > ai.provider
+		providerRef := relayAIProvider
+		resolved, found := savedCfg.ResolveProvider(providerRef)
+		if found {
+			if relayAIProvider == "" {
+				relayAIProvider = resolved.Provider
+			}
+			if relayAPIKey == "" {
+				relayAPIKey = resolved.APIKey
+			}
+			if relayBaseURL == "" {
+				relayBaseURL = resolved.BaseURL
+			}
+			if relayModel == "" {
+				relayModel = resolved.Model
+			}
 		}
 		if relayMaxRounds == 0 && savedCfg.AI.MaxRounds > 0 {
 			relayMaxRounds = savedCfg.AI.MaxRounds
@@ -315,7 +321,7 @@ func runRelay(cmd *cobra.Command, args []string) {
 
 	// Load MCP server configs from yaml config file
 	var mcpServers []mcpclient.ServerConfig
-	if savedCfg, err := config.Load(); err == nil {
+	if cfgErr == nil {
 		for _, s := range savedCfg.AI.MCPServers {
 			mcpServers = append(mcpServers, mcpclient.ServerConfig{
 				Name:    s.Name,
@@ -345,26 +351,18 @@ func runRelay(cmd *cobra.Command, args []string) {
 		os.Exit(1)
 	}
 
-	// Resolve provider and model names
+	// Resolve provider and model names for display
 	providerName := relayAIProvider
 	if providerName == "" {
 		providerName = "claude"
 	}
 	modelName := relayModel
 	if modelName == "" {
-		switch providerName {
-		case "deepseek":
-			modelName = "deepseek-chat"
-		case "kimi", "moonshot":
-			modelName = "moonshot-v1-8k"
-		default:
-			modelName = "claude-sonnet-4-20250514"
-		}
+		modelName = "(default)"
 	}
 
 	// Create agent pool for per-platform/channel model overrides
-	savedCfgForPool, _ := config.Load()
-	pool := agent.NewAgentPool(aiAgent, agentCfg, savedCfgForPool)
+	pool := agent.NewAgentPool(aiAgent, agentCfg, savedCfg)
 
 	// Create the router with the pool as message handler
 	r := router.New(pool.HandleMessage)

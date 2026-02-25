@@ -3,21 +3,31 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
 
 type Config struct {
-	Transport string          `yaml:"transport"` // "stdio" or "sse"
-	Port      int             `yaml:"port"`
-	Security  SecurityConfig  `yaml:"security"`
-	Logging   LoggingConfig   `yaml:"logging"`
-	AI        AIConfig        `yaml:"ai,omitempty"`
-	Platforms PlatformConfig  `yaml:"platforms,omitempty"`
-	Mode      string          `yaml:"mode,omitempty"` // "relay" or "router"
-	Relay     RelayConfig     `yaml:"relay,omitempty"`
-	Skills    SkillsConfig    `yaml:"skills,omitempty"`
-	Browser   BrowserConfig   `yaml:"browser,omitempty"`
+	Transport string                    `yaml:"transport"` // "stdio" or "sse"
+	Port      int                       `yaml:"port"`
+	Security  SecurityConfig            `yaml:"security"`
+	Logging   LoggingConfig             `yaml:"logging"`
+	AI        AIConfig                  `yaml:"ai,omitempty"`
+	Providers map[string]ProviderEntry  `yaml:"providers,omitempty"`
+	Platforms PlatformConfig            `yaml:"platforms,omitempty"`
+	Mode      string                    `yaml:"mode,omitempty"` // "relay" or "router"
+	Relay     RelayConfig               `yaml:"relay,omitempty"`
+	Skills    SkillsConfig              `yaml:"skills,omitempty"`
+	Browser   BrowserConfig             `yaml:"browser,omitempty"`
+}
+
+// ProviderEntry defines a named AI provider configuration.
+type ProviderEntry struct {
+	Provider string `yaml:"provider,omitempty"`
+	APIKey   string `yaml:"api_key,omitempty"`
+	BaseURL  string `yaml:"base_url,omitempty"`
+	Model    string `yaml:"model,omitempty"`
 }
 
 // BrowserConfig configures browser automation.
@@ -37,6 +47,7 @@ type BrowserConfig struct {
 type RelayConfig struct {
 	UserID   string `yaml:"user_id,omitempty"`
 	Platform string `yaml:"platform,omitempty"` // "feishu", "slack", "wechat", "wecom"
+	Provider string `yaml:"provider,omitempty"` // references a named provider in Providers map
 }
 
 type SkillsConfig struct {
@@ -95,6 +106,53 @@ func (c *Config) ResolveAI(platform, channelID string) AIConfig {
 		}
 	}
 	return base
+}
+
+// ResolveProvider looks up a named provider. Resolution order:
+//  1. Exact key match in Providers map
+//  2. Scan Providers for entry whose .Provider field matches name
+//  3. If Providers map is empty, construct from ai: block (backward compat)
+//  4. If name is empty, fall back: relay.provider → ai.provider
+func (c *Config) ResolveProvider(name string) (ProviderEntry, bool) {
+	if name == "" {
+		name = c.Relay.Provider
+	}
+	if name == "" {
+		name = c.AI.Provider
+	}
+	if name == "" {
+		return ProviderEntry{}, false
+	}
+
+	if len(c.Providers) > 0 {
+		// 1. Exact key match
+		if e, ok := c.Providers[name]; ok {
+			if e.Provider == "" {
+				e.Provider = name
+			}
+			return e, true
+		}
+		// 2. Match by provider type
+		for _, e := range c.Providers {
+			if strings.EqualFold(e.Provider, name) {
+				return e, true
+			}
+		}
+		return ProviderEntry{}, false
+	}
+
+	// 3. Backward compat: construct from ai: block
+	if strings.EqualFold(c.AI.Provider, name) || name == "" {
+		return ProviderEntry{
+			Provider: c.AI.Provider,
+			APIKey:   c.AI.APIKey,
+			BaseURL:  c.AI.BaseURL,
+			Model:    c.AI.Model,
+		}, true
+	}
+	// Provider name doesn't match ai: block — return entry with just the provider name
+	// so CLI overrides (--api-key, --model) can fill in the rest
+	return ProviderEntry{Provider: name}, true
 }
 
 func applyOverride(base AIConfig, o AIOverride) AIConfig {

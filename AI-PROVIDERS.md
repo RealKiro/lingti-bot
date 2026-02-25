@@ -11,9 +11,9 @@ lingti-bot supports **16 AI providers** covering mainstream LLM platforms global
 | 1 | `deepseek` | DeepSeek (recommended / 推荐) | `deepseek-chat` | `https://api.deepseek.com/v1` | [platform.deepseek.com](https://platform.deepseek.com/api_keys) |
 | 2 | `qwen` | Qwen / 通义千问 | `qwen-plus` | `https://dashscope.aliyuncs.com/compatible-mode/v1` | [bailian.console.aliyun.com](https://bailian.console.aliyun.com/) |
 | 3 | `claude` | Claude (Anthropic) | `claude-sonnet-4-20250514` | Anthropic native API | [console.anthropic.com](https://console.anthropic.com/) |
-| 4 | `kimi` | Kimi / Moonshot / 月之暗面 | `moonshot-v1-8k` | `https://api.moonshot.cn/v1` | [platform.moonshot.cn](https://platform.moonshot.cn/) |
+| 4 | `kimi` | Kimi / Moonshot / 月之暗面 | `kimi-k2.5` | `https://api.moonshot.cn/v1` | [platform.moonshot.cn](https://platform.moonshot.cn/) |
 
-> **Kimi thinking models / Kimi 思考模型：** `kimi-k2.5` 等带推理（thinking）能力的模型已支持。lingti-bot 会自动在对话历史中保留 `reasoning_content`，确保 tool call 多轮对话正常工作。使用方式：`--model kimi-k2.5`。
+> **Kimi thinking models / Kimi 思考模型：** 默认模型已升级为 `kimi-k2.5`（思考模型）。lingti-bot 会自动在对话历史中保留 `reasoning_content`，确保 tool call 多轮对话正常工作。如需使用非思考模型，可指定 `--model moonshot-v1-8k`。
 | 5 | `minimax` | MiniMax / 海螺 AI | `MiniMax-Text-01` | `https://api.minimax.chat/v1` | [platform.minimaxi.com](https://platform.minimaxi.com/) |
 | 6 | `doubao` | Doubao / 豆包 (ByteDance) | `doubao-pro-32k` | `https://ark.cn-beijing.volces.com/api/v3` | [console.volcengine.com/ark](https://console.volcengine.com/ark) |
 | 7 | `zhipu` | Zhipu / 智谱 GLM | `glm-4-flash` | `https://open.bigmodel.cn/api/paas/v4` | [open.bigmodel.cn](https://open.bigmodel.cn/) |
@@ -64,7 +64,70 @@ lingti-bot relay --provider qwen --api-key sk-xxx --model qwen-max
 
 ---
 
-## Per-Platform AI Overrides / 按平台覆盖 AI 设置
+## Named Providers / 命名 Provider 配置（推荐）
+
+The recommended way to configure AI providers. Define each provider as a named entry, then reference by name.
+
+推荐的 AI 配置方式。将每个 provider 定义为命名条目，然后按名称引用。
+
+### Config Format / 配置格式
+
+```yaml
+providers:
+  my-deepseek:
+    provider: deepseek
+    api_key: sk-xxx
+    model: deepseek-chat
+  my-kimi:
+    provider: kimi
+    api_key: ak-xxx
+    model: kimi-k2.5
+  my-minimax:
+    provider: minimax
+    api_key: sk-xxx
+    base_url: https://api.minimax.chat/v1
+    model: MiniMax-M2.5
+
+relay:
+  platform: wecom
+  provider: my-kimi        # references named provider
+
+ai:
+  max_rounds: 100          # shared settings stay here
+  mcp_servers: [...]
+```
+
+### Resolution / 解析规则
+
+When `--provider` is specified (CLI or config), lingti-bot resolves the name:
+
+1. **Exact key match** — `--provider my-kimi` matches `providers.my-kimi` directly
+2. **Provider type match** — `--provider kimi` scans entries for `.provider == "kimi"`
+3. **Backward compat** — if no `providers:` map exists, falls back to `ai:` block
+
+CLI flags `--api-key`, `--base-url`, `--model` still override individual fields on the resolved entry.
+
+```bash
+# Use named provider directly
+lingti-bot relay --provider my-kimi
+
+# Use provider type (finds first matching entry)
+lingti-bot relay --provider kimi
+
+# Override model on a named provider
+lingti-bot relay --provider my-kimi --model moonshot-v1-8k
+```
+
+### Benefits / 优势
+
+- Each provider carries its own api_key, base_url, model — no cross-contamination
+- `--provider kimi` won't inherit deepseek's base_url from the `ai:` block
+- Easy to switch between providers: just change `relay.provider`
+- Old `ai:` format still works unchanged (backward compatible)
+
+---
+
+## Per-Platform AI Overrides / 按平台覆盖 AI 设置（旧格式）
 
 lingti-bot 的独有功能：可以为不同消息平台或频道指定不同的 AI 服务。一个实例同时服务多个平台，每个平台使用最适合的模型。
 
