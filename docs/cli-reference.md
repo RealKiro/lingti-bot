@@ -208,7 +208,7 @@ lingti-bot router
 
 ### gateway
 
-Start the WebSocket gateway for real-time AI interaction from custom clients.
+Start the WebSocket gateway for real-time AI interaction from custom clients. See [docs/gateway.md](gateway.md) for the full protocol reference.
 
 ```bash
 lingti-bot gateway [flags]
