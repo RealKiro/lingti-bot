@@ -444,11 +444,13 @@ func BrowserPress(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResu
 
 // BrowserCommentZhihu posts a comment on a Zhihu answer using the verified JS recipe.
 // It expands the first answer's comment section, types the comment, and submits.
+// Optional reply_to param: username to reply to (nested reply) instead of posting a top-level comment.
 func BrowserCommentZhihu(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	comment, ok := req.Params.Arguments["comment"].(string)
 	if !ok || comment == "" {
 		return mcp.NewToolResultError("comment is required"), nil
 	}
+	replyTo, _ := req.Params.Arguments["reply_to"].(string)
 
 	b := browser.Instance()
 	page, err := b.ActivePage()
@@ -456,136 +458,207 @@ func BrowserCommentZhihu(_ context.Context, req mcp.CallToolRequest) (*mcp.CallT
 		return mcp.NewToolResultError(fmt.Sprintf("failed to get page: %v", err)), nil
 	}
 
-	// Step 1a: if editor is already open, skip opening it.
-	// Otherwise click "添加评论" directly if visible, else click "X条评论" to expand
-	// the comment section first, then click "添加评论" inside it.
-	r1, err := browser.ExecuteJS(page, `
-		// Already open?
-		if (document.querySelector('.public-DraftEditor-content')) { return 'editor already open'; }
+	var r1 string
 
-		// Prefer clicking "添加评论" directly (zhuanlan pages show this right away)
-		var addBtn = Array.from(document.querySelectorAll('button,span,a')).find(function(e) {
-			return e.textContent.replace(/\u200b/g,'').trim() === '添加评论';
-		});
-		if (addBtn) { addBtn.click(); return 'clicked 添加评论'; }
+	if replyTo != "" {
+		// Nested reply mode: find the 回复 button next to the specified user's comment and click it.
+		jsonReplyTo, _ := json.Marshal(replyTo)
+		r1, err = browser.ExecuteJS(page, fmt.Sprintf(`
+			var username = %s;
+			// Find links whose text exactly matches the username (avatar + name links both match)
+			var userEls = Array.from(document.querySelectorAll('a')).filter(function(a) {
+				return a.textContent.trim() === username;
+			});
+			if (!userEls.length) { return 'user not found: ' + username; }
 
-		// On question pages "X条评论" toggles the list; "添加评论" appears inside.
-		// Click the first answer's comment toggle to expand it.
-		// Exclude "收起评论" (collapse) — we must not collapse an already-open section.
-		var toggleBtn = Array.from(document.querySelectorAll('button,span')).find(function(e) {
-			var t = e.textContent.replace(/\u200b/g,'').trim();
-			if (t.indexOf('收起') !== -1) return false;
-			return /^[\d]+\s*条评论$/.test(t) || t === '评论';
-		});
-		if (toggleBtn) { toggleBtn.click(); return 'expanded: ' + toggleBtn.textContent.trim(); }
+			// Collect all 回复 buttons on the page
+			var replyBtns = Array.from(document.querySelectorAll('button')).filter(function(b) {
+				return b.textContent.replace(/\u200b/g,'').trim() === '回复';
+			});
+			if (!replyBtns.length) { return 'no reply buttons found'; }
 
-		return 'no comment button found';
-	`)
-	logger.Debug("[browser_comment_zhihu] step1a: %s", r1)
-	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf("step1a failed: %v", err)), nil
-	}
+			// Find the first 回复 button that follows the first username element in DOM order
+			var userEl = userEls[0];
+			var found = null;
+			for (var i = 0; i < replyBtns.length; i++) {
+				if (userEl.compareDocumentPosition(replyBtns[i]) & Node.DOCUMENT_POSITION_FOLLOWING) {
+					found = replyBtns[i];
+					break;
+				}
+			}
+			if (found) { found.click(); return 'clicked reply for: ' + username; }
+			return 'reply button not found after: ' + username;
+		`, string(jsonReplyTo)))
+		logger.Debug("[browser_comment_zhihu] reply_to step1: %s", r1)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("reply_to step failed: %v", err)), nil
+		}
+		if !strings.HasPrefix(r1, "clicked") {
+			return mcp.NewToolResultError(r1), nil
+		}
+	} else {
+		// Top-level comment mode: open the article/answer comment editor.
+		// Step 1a: if editor is already open, skip opening it.
+		// Otherwise click "添加评论" directly if visible, else click "X条评论" to expand
+		// the comment section first, then click "添加评论" inside it.
+		r1, err = browser.ExecuteJS(page, `
+			// Already open?
+			if (document.querySelector('.public-DraftEditor-content')) { return 'editor already open'; }
 
-	// Step 1b: if we expanded comments (not directly clicked 添加评论), now find and
-	// click the "添加评论" input placeholder that appears inside the expanded section.
-	// Poll up to 4s for it to appear.
-	// IMPORTANT: textContent is recursive, so querying 'div' would match any ancestor
-	// that contains "添加评论" in its subtree. We restrict to elements that either:
-	//   (a) have no child elements (leaf nodes), or
-	//   (b) are known interactive types (button, span, a)
-	//   (c) are the DraftEditor placeholder div specifically
-	if r1 != "editor already open" && r1 != "clicked 添加评论" {
-		var addClicked bool
-		for range 20 {
-			time.Sleep(200 * time.Millisecond)
-			res, _ := browser.ExecuteJS(page, `
-				// Already open after expand?
-				if (document.querySelector('.public-DraftEditor-content')) { return 'editor appeared'; }
+			// Prefer clicking "添加评论" directly (zhuanlan pages show this right away)
+			var addBtn = Array.from(document.querySelectorAll('button,span,a')).find(function(e) {
+				return e.textContent.replace(/\u200b/g,'').trim() === '添加评论';
+			});
+			if (addBtn) { addBtn.click(); return 'clicked 添加评论'; }
 
-				// Specific known selectors for the comment input area on Zhihu question pages
-				var specific = document.querySelector(
-					'.CommentInput, [class*="CommentInput"], ' +
-					'.DraftEditor-root, [class*="comment-input"], ' +
-					'[placeholder="添加评论"], [data-placeholder="添加评论"]'
-				);
-				if (specific) { specific.click(); return 'clicked specific'; }
+			// On question pages "X条评论" toggles the list; "添加评论" appears inside.
+			// Click the first answer's comment toggle to expand it.
+			// Exclude "收起评论" (collapse) — we must not collapse an already-open section.
+			var toggleBtn = Array.from(document.querySelectorAll('button,span')).find(function(e) {
+				var t = e.textContent.replace(/\u200b/g,'').trim();
+				if (t.indexOf('收起') !== -1) return false;
+				return /^[\d]+\s*条评论$/.test(t) || t === '评论';
+			});
+			if (toggleBtn) { toggleBtn.click(); return 'expanded: ' + toggleBtn.textContent.trim(); }
 
-				// button/span/a with exact text — safe (not recursive parent match)
-				var btn = Array.from(document.querySelectorAll('button,span,a')).find(function(e) {
-					return e.textContent.replace(/\u200b/g,'').trim() === '添加评论';
-				});
-				if (btn) { btn.click(); return 'clicked btn: ' + btn.tagName; }
+			return 'no comment button found';
+		`)
+		logger.Debug("[browser_comment_zhihu] step1a: %s", r1)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("step1a failed: %v", err)), nil
+		}
 
-				// Leaf div/label with exact text (no child elements that also contain the text)
-				var leaf = Array.from(document.querySelectorAll('div,label')).find(function(e) {
-					if (e.textContent.replace(/\u200b/g,'').trim() !== '添加评论') return false;
-					// Make sure no child element also has this text (i.e. we are the real target)
-					return !Array.from(e.children).some(function(c) {
-						return c.textContent.replace(/\u200b/g,'').trim() === '添加评论';
+		// Step 1b: if we expanded comments (not directly clicked 添加评论), now find and
+		// click the "添加评论" input placeholder that appears inside the expanded section.
+		// Poll up to 4s for it to appear.
+		// IMPORTANT: textContent is recursive, so querying 'div' would match any ancestor
+		// that contains "添加评论" in its subtree. We restrict to elements that either:
+		//   (a) have no child elements (leaf nodes), or
+		//   (b) are known interactive types (button, span, a)
+		//   (c) are the DraftEditor placeholder div specifically
+		if r1 != "editor already open" && r1 != "clicked 添加评论" {
+			var addClicked bool
+			for range 20 {
+				time.Sleep(200 * time.Millisecond)
+				res, _ := browser.ExecuteJS(page, `
+					// Already open after expand?
+					if (document.querySelector('.public-DraftEditor-content')) { return 'editor appeared'; }
+
+					// Specific known selectors for the comment input area on Zhihu question pages
+					var specific = document.querySelector(
+						'.CommentInput, [class*="CommentInput"], ' +
+						'.DraftEditor-root, [class*="comment-input"], ' +
+						'[placeholder="添加评论"], [data-placeholder="添加评论"]'
+					);
+					if (specific) { specific.click(); return 'clicked specific'; }
+
+					// button/span/a with exact text — safe (not recursive parent match)
+					var btn = Array.from(document.querySelectorAll('button,span,a')).find(function(e) {
+						return e.textContent.replace(/\u200b/g,'').trim() === '添加评论';
 					});
-				});
-				if (leaf) { leaf.click(); return 'clicked leaf: ' + leaf.className.slice(0,40); }
+					if (btn) { btn.click(); return 'clicked btn: ' + btn.tagName; }
 
-				return 'waiting';
-			`)
-			if res != "waiting" {
-				addClicked = true
-				break
+					// Leaf div/label with exact text (no child elements that also contain the text)
+					var leaf = Array.from(document.querySelectorAll('div,label')).find(function(e) {
+						if (e.textContent.replace(/\u200b/g,'').trim() !== '添加评论') return false;
+						// Make sure no child element also has this text (i.e. we are the real target)
+						return !Array.from(e.children).some(function(c) {
+							return c.textContent.replace(/\u200b/g,'').trim() === '添加评论';
+						});
+					});
+					if (leaf) { leaf.click(); return 'clicked leaf: ' + leaf.className.slice(0,40); }
+
+					return 'waiting';
+				`)
+				if res != "waiting" {
+					addClicked = true
+					break
+				}
+			}
+			if !addClicked {
+				return mcp.NewToolResultError(fmt.Sprintf("could not find 添加评论 after expanding comments (step1=%s)", r1)), nil
 			}
 		}
-		if !addClicked {
-			return mcp.NewToolResultError(fmt.Sprintf("could not find 添加评论 after expanding comments (step1=%s)", r1)), nil
-		}
 	}
 
-	// Step 1c: wait for the Draft.js editor to appear (poll up to 4s).
-	// Skip if step1a already confirmed the editor is open.
-	var editorReady bool
+	// Step 1c: wait for an editor to appear (poll up to 4s).
+	// Zhihu article top-level comments use Draft.js (.public-DraftEditor-content).
+	// Nested replies use a plain textarea/contenteditable.
+	var editorType string
 	if r1 == "editor already open" {
-		editorReady = true
+		editorType = "draftjs"
 	} else {
 		for range 20 {
 			time.Sleep(200 * time.Millisecond)
-			check, _ := browser.ExecuteJS(page, `document.querySelector('.public-DraftEditor-content') ? 'yes' : 'no'`)
-			if check == "yes" {
-				editorReady = true
+			editorType, _ = browser.ExecuteJS(page, `
+				if (document.querySelector('.public-DraftEditor-content')) { return 'draftjs'; }
+				var el = document.activeElement;
+				if (el && (el.tagName === 'TEXTAREA' || el.contentEditable === 'true' || el.getAttribute('role') === 'textbox')) {
+					return 'plain:' + el.tagName;
+				}
+				var ta = document.querySelector('textarea');
+				if (ta) { return 'plain:TEXTAREA'; }
+				return 'waiting';
+			`)
+			if editorType != "waiting" {
 				break
 			}
 		}
 	}
-	if !editorReady {
-		return mcp.NewToolResultError(fmt.Sprintf("editor did not appear after clicking 添加评论 (step1=%s)", r1)), nil
+	if editorType == "waiting" || editorType == "" {
+		return mcp.NewToolResultError(fmt.Sprintf("editor did not appear (step1=%s)", r1)), nil
 	}
 
-	// Step 2: insert text into Draft.js editor via ClipboardEvent paste.
-	// execCommand('insertText') inserts DOM text but does NOT update Draft.js's internal
-	// EditorState, so the 发布 button stays disabled. Dispatching a paste ClipboardEvent
-	// causes Draft.js to process the text through its own paste handler, updating state.
+	// Step 2: insert text via ClipboardEvent paste.
+	// For Draft.js: targets .public-DraftEditor-content
+	// For plain textarea/contenteditable: targets the active element or first textarea.
+	// ClipboardEvent paste works for both Draft.js and React-controlled plain editors;
+	// execCommand('insertText') is used as fallback for plain editors.
 	jsonComment, _ := json.Marshal(comment)
-	r2, err := browser.ExecuteJS(page, fmt.Sprintf(`
-		var ed = document.querySelector('.public-DraftEditor-content');
-		if (!ed) { return 'editor not found'; }
-		ed.click();
-		ed.focus();
-		document.execCommand('selectAll', false);
-		var dt = new DataTransfer();
-		dt.setData('text/plain', %s);
-		ed.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
-		return 'pasted';
-	`, string(jsonComment)))
-	logger.Debug("[browser_comment_zhihu] step2 paste: %s", r2)
+	var pasteScript string
+	if editorType == "draftjs" {
+		pasteScript = fmt.Sprintf(`
+			var ed = document.querySelector('.public-DraftEditor-content');
+			if (!ed) { return 'editor not found'; }
+			ed.click(); ed.focus();
+			document.execCommand('selectAll', false);
+			var dt = new DataTransfer();
+			dt.setData('text/plain', %s);
+			ed.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+			return 'pasted-draftjs';
+		`, string(jsonComment))
+	} else {
+		pasteScript = fmt.Sprintf(`
+			var ed = document.activeElement;
+			if (!ed || (ed.tagName !== 'TEXTAREA' && ed.contentEditable !== 'true' && ed.getAttribute('role') !== 'textbox')) {
+				ed = document.querySelector('textarea') || document.querySelector('[contenteditable="true"]');
+			}
+			if (!ed) { return 'editor not found'; }
+			ed.focus();
+			var dt = new DataTransfer();
+			dt.setData('text/plain', %s);
+			var pasted = ed.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+			// Fallback: execCommand for plain contenteditable
+			if (ed.tagName === 'TEXTAREA' || ed.contentEditable === 'true') {
+				document.execCommand('insertText', false, %s);
+			}
+			return 'pasted-plain';
+		`, string(jsonComment), string(jsonComment))
+	}
+	r2, err := browser.ExecuteJS(page, pasteScript)
+	logger.Debug("[browser_comment_zhihu] step2 paste: %s (editorType=%s)", r2, editorType)
 	if err != nil || r2 == "editor not found" {
 		return mcp.NewToolResultError(fmt.Sprintf("step2 paste failed: %v %s", err, r2)), nil
 	}
 
-	// Wait for Draft.js to process the paste event and re-render
+	// Wait for the editor framework to process the paste and re-render
 	time.Sleep(600 * time.Millisecond)
 
 	// Step 3: click the 发布 submit button.
 	// IMPORTANT: document.querySelector('button.Button--primary') matches the search bar button first.
 	// Must find specifically the button with text "发布".
 	r3, err := browser.ExecuteJS(page, `
-		var btn = Array.from(document.querySelectorAll('button.Button--primary')).find(function(b){ return b.textContent.trim() === '发布'; });
+		var btn = Array.from(document.querySelectorAll('button')).find(function(b){ return b.textContent.replace(/\u200b/g,'').trim() === '发布'; });
 		if (btn && !btn.disabled) { btn.click(); return 'submitted'; }
 		if (btn && btn.disabled) { return 'submit button is disabled (comment may be empty)'; }
 		return 'submit button not found';
@@ -596,9 +669,12 @@ func BrowserCommentZhihu(_ context.Context, req mcp.CallToolRequest) (*mcp.CallT
 	}
 
 	if r3 == "submitted" {
+		if replyTo != "" {
+			return mcp.NewToolResultText(fmt.Sprintf("Reply to %q posted successfully: %q", replyTo, comment)), nil
+		}
 		return mcp.NewToolResultText(fmt.Sprintf("Comment posted successfully: %q", comment)), nil
 	}
-	return mcp.NewToolResultError(fmt.Sprintf("comment may not have submitted: %s (expand=%s, type=%s)", r3, r1, r2)), nil
+	return mcp.NewToolResultError(fmt.Sprintf("comment may not have submitted: %s (expand=%s, paste=%s)", r3, r1, r2)), nil
 }
 
 // BrowserCommentXiaohongshu posts a comment on a Xiaohongshu note using the verified JS recipe.

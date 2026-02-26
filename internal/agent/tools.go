@@ -546,9 +546,9 @@ func executeBrowserExecuteJS(ctx context.Context, script string) string {
 	return extractText(result)
 }
 
-func executeBrowserCommentZhihu(ctx context.Context, comment string) string {
+func executeBrowserCommentZhihu(ctx context.Context, comment, replyTo string) string {
 	req := mcp.CallToolRequest{}
-	req.Params.Arguments = map[string]interface{}{"comment": comment}
+	req.Params.Arguments = map[string]interface{}{"comment": comment, "reply_to": replyTo}
 	result, err := tools.BrowserCommentZhihu(ctx, req)
 	if err != nil {
 		return "Error: " + err.Error()

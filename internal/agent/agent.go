@@ -512,6 +512,7 @@ Use the page's UI elements (search boxes, buttons, menus) to accomplish the task
 Zhihu uses a Draft.js editor. Direct DOM manipulation (innerHTML, value=, execCommand insertText) does NOT update Draft.js internal state — the 发布 button will stay DISABLED. You MUST use ClipboardEvent paste.
 
 PREFERRED: call browser_comment_zhihu(comment="...") — handles everything automatically.
+To reply to a specific person's comment (nested reply), use browser_comment_zhihu(comment="...", reply_to="username"). The tool will find that user's 回复 button and post a nested reply instead of a top-level comment.
 
 If using mcp_chrome_evaluate_script instead, use EXACTLY this 3-step sequence:
 
@@ -1311,11 +1312,12 @@ func (a *Agent) buildToolsList() []Tool {
 		},
 		{
 			Name:        "browser_comment_zhihu",
-			Description: "Post a comment on a Zhihu answer. Must already be on a Zhihu question/answer page. Automatically expands the comment section, types the comment using Draft.js execCommand, and clicks 发布 to submit. Use this instead of browser_click + browser_type for Zhihu commenting.",
+			Description: "Post a top-level comment OR a nested reply on Zhihu. Must already be on the Zhihu page. For a top-level comment omit reply_to. To reply to a specific person's comment, set reply_to to their username (e.g. \"Jockery\") — the tool will find their 回复 button and post a nested reply. Handles both Draft.js and plain textarea editors automatically.",
 			InputSchema: jsonSchema(map[string]any{
 				"type": "object",
 				"properties": map[string]any{
-					"comment": map[string]string{"type": "string", "description": "The comment text to post"},
+					"comment":  map[string]string{"type": "string", "description": "The comment text to post"},
+					"reply_to": map[string]string{"type": "string", "description": "Username to reply to (nested reply). Omit for a top-level comment."},
 				},
 				"required": []string{"comment"},
 			}),
@@ -1822,7 +1824,8 @@ func (a *Agent) callToolDirect(ctx context.Context, name string, args map[string
 		return executeBrowserExecuteJS(ctx, script)
 	case "browser_comment_zhihu":
 		comment, _ := args["comment"].(string)
-		return executeBrowserCommentZhihu(ctx, comment)
+		replyTo, _ := args["reply_to"].(string)
+		return executeBrowserCommentZhihu(ctx, comment, replyTo)
 	case "browser_comment_xiaohongshu":
 		comment, _ := args["comment"].(string)
 		return executeBrowserCommentXiaohongshu(ctx, comment)
