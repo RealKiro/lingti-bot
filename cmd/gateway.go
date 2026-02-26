@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/pltanton/lingti-bot/internal/agent"
@@ -15,8 +16,9 @@ import (
 )
 
 var (
-	gatewayAddr      string
-	gatewayAuthToken string
+	gatewayAddr       string
+	gatewayAuthToken  string
+	gatewayAuthTokens []string
 )
 
 var gatewayCmd = &cobra.Command{
@@ -35,7 +37,8 @@ This enables:
 
 Environment variables:
   - GATEWAY_ADDR: Address to listen on (default: :18789)
-  - GATEWAY_AUTH_TOKEN: Optional authentication token
+  - GATEWAY_AUTH_TOKEN: Single authentication token
+  - GATEWAY_AUTH_TOKENS: Comma-separated list of authentication tokens (multiple admins)
   - AI_API_KEY: API Key for the AI provider`,
 	Run: runGateway,
 }
@@ -44,7 +47,8 @@ func init() {
 	rootCmd.AddCommand(gatewayCmd)
 
 	gatewayCmd.Flags().StringVar(&gatewayAddr, "addr", "", "Gateway address (or GATEWAY_ADDR env, default: :18789)")
-	gatewayCmd.Flags().StringVar(&gatewayAuthToken, "auth-token", "", "Authentication token (or GATEWAY_AUTH_TOKEN env)")
+	gatewayCmd.Flags().StringVar(&gatewayAuthToken, "auth-token", "", "Single authentication token (or GATEWAY_AUTH_TOKEN env)")
+	gatewayCmd.Flags().StringSliceVar(&gatewayAuthTokens, "auth-tokens", nil, "Multiple authentication tokens, comma-separated (or GATEWAY_AUTH_TOKENS env)")
 	gatewayCmd.Flags().StringVar(&aiProvider, "provider", "", "AI provider: claude, deepseek, kimi, qwen (or AI_PROVIDER env)")
 	gatewayCmd.Flags().StringVar(&aiAPIKey, "api-key", "", "AI API Key (or AI_API_KEY env)")
 	gatewayCmd.Flags().StringVar(&aiBaseURL, "base-url", "", "AI API base URL (or AI_BASE_URL env)")
@@ -61,6 +65,15 @@ func runGateway(cmd *cobra.Command, args []string) {
 	}
 	if gatewayAuthToken == "" {
 		gatewayAuthToken = os.Getenv("GATEWAY_AUTH_TOKEN")
+	}
+	if len(gatewayAuthTokens) == 0 {
+		if v := os.Getenv("GATEWAY_AUTH_TOKENS"); v != "" {
+			for _, t := range strings.Split(v, ",") {
+				if t = strings.TrimSpace(t); t != "" {
+					gatewayAuthTokens = append(gatewayAuthTokens, t)
+				}
+			}
+		}
 	}
 	if aiProvider == "" {
 		aiProvider = os.Getenv("AI_PROVIDER")
@@ -105,8 +118,9 @@ func runGateway(cmd *cobra.Command, args []string) {
 
 	// Create the gateway
 	gw := gateway.New(gateway.Config{
-		Addr:      gatewayAddr,
-		AuthToken: gatewayAuthToken,
+		Addr:       gatewayAddr,
+		AuthToken:  gatewayAuthToken,  // single token (backward-compat)
+		AuthTokens: gatewayAuthTokens, // multiple tokens
 	})
 
 	// Set up message handler that wraps agent responses for streaming
@@ -159,8 +173,12 @@ func runGateway(cmd *cobra.Command, args []string) {
 	}()
 
 	logger.Info("Gateway started on %s", gatewayAddr)
+	total := len(gatewayAuthTokens)
 	if gatewayAuthToken != "" {
-		logger.Info("Authentication enabled")
+		total++
+	}
+	if total > 0 {
+		logger.Info("Authentication enabled (%d token(s))", total)
 	}
 	logger.Info("Press Ctrl+C to stop.")
 

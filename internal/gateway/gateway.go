@@ -74,23 +74,24 @@ type MessageHandler func(ctx context.Context, clientID string, sessionID string,
 
 // Gateway manages WebSocket connections and message routing
 type Gateway struct {
-	addr           string
-	clients        map[string]*Client
-	register       chan *Client
-	unregister     chan *Client
-	broadcast      chan []byte
-	handler        MessageHandler
-	authToken      string // Optional authentication token
-	mu             sync.RWMutex
-	ctx            context.Context
-	cancel         context.CancelFunc
-	upgrader       websocket.Upgrader
+	addr        string
+	clients     map[string]*Client
+	register    chan *Client
+	unregister  chan *Client
+	broadcast   chan []byte
+	handler     MessageHandler
+	authTokens  []string // Optional allowed authentication tokens (any one is accepted)
+	mu          sync.RWMutex
+	ctx         context.Context
+	cancel      context.CancelFunc
+	upgrader    websocket.Upgrader
 }
 
 // Config holds gateway configuration
 type Config struct {
-	Addr      string // Address to listen on, e.g., ":18789"
-	AuthToken string // Optional auth token for clients
+	Addr       string   // Address to listen on, e.g., ":18789"
+	AuthToken  string   // Single auth token (backward-compat; merged with AuthTokens)
+	AuthTokens []string // Multiple allowed auth tokens; any one grants access
 }
 
 // New creates a new Gateway
@@ -99,13 +100,28 @@ func New(cfg Config) *Gateway {
 		cfg.Addr = ":18789"
 	}
 
+	// Merge single AuthToken into the list for backward compatibility
+	tokens := cfg.AuthTokens
+	if cfg.AuthToken != "" {
+		tokens = append(tokens, cfg.AuthToken)
+	}
+	// Deduplicate
+	seen := make(map[string]struct{}, len(tokens))
+	unique := tokens[:0]
+	for _, t := range tokens {
+		if _, ok := seen[t]; !ok {
+			seen[t] = struct{}{}
+			unique = append(unique, t)
+		}
+	}
+
 	return &Gateway{
 		addr:       cfg.Addr,
 		clients:    make(map[string]*Client),
 		register:   make(chan *Client),
 		unregister: make(chan *Client),
 		broadcast:  make(chan []byte, 256),
-		authToken:  cfg.AuthToken,
+		authTokens: unique,
 		upgrader: websocket.Upgrader{
 			ReadBufferSize:  1024,
 			WriteBufferSize: 1024,
@@ -208,8 +224,8 @@ func (g *Gateway) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		metadata: make(map[string]string),
 	}
 
-	// If no auth token is required, auto-authorize
-	if g.authToken == "" {
+	// If no auth tokens are configured, auto-authorize
+	if len(g.authTokens) == 0 {
 		client.authorized = true
 	}
 
@@ -236,7 +252,7 @@ func (g *Gateway) handleStatus(w http.ResponseWriter, r *http.Request) {
 		"status":       "running",
 		"clients":      clientCount,
 		"addr":         g.addr,
-		"auth_enabled": g.authToken != "",
+		"auth_enabled": len(g.authTokens) > 0,
 	})
 }
 
@@ -366,14 +382,14 @@ func (c *Client) handleMessage(msg Message) {
 		c.handleAuth(msg)
 
 	case MsgTypeChat:
-		if !c.authorized && c.gateway.authToken != "" {
+		if !c.authorized && len(c.gateway.authTokens) > 0 {
 			c.sendError("unauthorized", "Authentication required")
 			return
 		}
 		c.handleChat(msg)
 
 	case MsgTypeCommand:
-		if !c.authorized && c.gateway.authToken != "" {
+		if !c.authorized && len(c.gateway.authTokens) > 0 {
 			c.sendError("unauthorized", "Authentication required")
 			return
 		}
@@ -394,8 +410,13 @@ func (c *Client) handleAuth(msg Message) {
 		return
 	}
 
-	if payload.Token == c.gateway.authToken {
-		c.authorized = true
+	for _, allowed := range c.gateway.authTokens {
+		if payload.Token == allowed {
+			c.authorized = true
+			break
+		}
+	}
+	if c.authorized {
 		c.sendAuthResult(true, "")
 	} else {
 		c.sendAuthResult(false, "Invalid token")
