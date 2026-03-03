@@ -63,6 +63,60 @@ lingti-bot relay --platform wecom --provider deepseek --api-key sk-xxx
 ```
 
 ## 样例
+
+### <a id="web-chat-ui"></a>内置 Web 聊天界面 — 浏览器直开，零配置
+
+无需微信、无需 Slack，一个参数即可在本地浏览器中打开完整聊天界面：
+
+```bash
+lingti-bot router --provider deepseek --api-key sk-xxx --webapp-port 8080
+# 打开浏览器访问 http://localhost:8080
+```
+
+<p align="center">
+<img src="docs/images/webapp-demo.png" alt="Web 聊天界面演示" width="800" />
+</p>
+
+**核心特性：**
+
+| 特性 | 说明 |
+|------|------|
+| **多会话并行** | 左侧边栏管理多个独立会话，每个会话有独立的 AI 记忆上下文，互不干扰 |
+| **并发处理** | 在会话 A 等待长任务时，立即切换到会话 B 发送新消息——两者并行处理 |
+| **会话持久化** | 所有会话列表和聊天记录保存在浏览器 `localStorage`，刷新页面不丢失 |
+| **Markdown 渲染** | AI 回复支持完整 Markdown：代码块、表格、列表、加粗等 |
+| **端口自动切换** | 若指定端口被占用，自动递增尝试直到找到空闲端口 |
+| **无需额外安装** | 纯 HTML + 原生 JS，内嵌于二进制，无 Node.js / npm 依赖 |
+
+**多会话并行示意：**
+
+```
+浏览器
+├── 会话 A（UUID-1）── AI 正在处理长任务...
+├── 会话 B（UUID-2）── 刚发了新消息，AI 立即响应
+└── 会话 C（UUID-3）── 历史记录，随时可查
+```
+
+每个会话对应一个独立 `channelID`，AI 记忆完全隔离——在会话 A 说的内容不会影响会话 B 的上下文。
+
+**通过配置文件启用：**
+
+```yaml
+# ~/.lingti.yaml
+platforms:
+  webapp:
+    port: 8080
+```
+
+**环境变量：**
+
+```bash
+export WEBAPP_PORT=8080
+lingti-bot router --provider deepseek --api-key sk-xxx
+```
+
+---
+
 ### 智能对话、文件管理、信息检索
 <table>
 <tr>
@@ -582,57 +636,6 @@ lingti-bot router \
 2. 在应用详情页获取 AppKey (ClientID) 和 AppSecret (ClientSecret)
 3. 开启机器人功能，配置消息接收模式为 **Stream 模式**
 4. 运行上述命令即可
-
-### <a id="web-chat-ui"></a>内置 Web 聊天界面 — 浏览器直开，零配置
-
-无需微信、无需 Slack，一个参数即可在本地浏览器中打开完整聊天界面：
-
-```bash
-lingti-bot router --provider deepseek --api-key sk-xxx --webapp-port 8080
-# 打开浏览器访问 http://localhost:8080
-```
-
-<p align="center">
-<img src="docs/images/webapp-demo.png" alt="Web 聊天界面演示" width="800" />
-</p>
-
-**核心特性：**
-
-| 特性 | 说明 |
-|------|------|
-| **多会话并行** | 左侧边栏管理多个独立会话，每个会话有独立的 AI 记忆上下文，互不干扰 |
-| **并发处理** | 在会话 A 等待长任务时，立即切换到会话 B 发送新消息——两者并行处理 |
-| **会话持久化** | 所有会话列表和聊天记录保存在浏览器 `localStorage`，刷新页面不丢失 |
-| **Markdown 渲染** | AI 回复支持完整 Markdown：代码块、表格、列表、加粗等 |
-| **端口自动切换** | 若指定端口被占用，自动递增尝试直到找到空闲端口 |
-| **无需额外安装** | 纯 HTML + 原生 JS，内嵌于二进制，无 Node.js / npm 依赖 |
-
-**多会话并行示意：**
-
-```
-浏览器
-├── 会话 A（UUID-1）── AI 正在处理长任务...
-├── 会话 B（UUID-2）── 刚发了新消息，AI 立即响应
-└── 会话 C（UUID-3）── 历史记录，随时可查
-```
-
-每个会话对应一个独立 `channelID`，AI 记忆完全隔离——在会话 A 说的内容不会影响会话 B 的上下文。
-
-**通过配置文件启用：**
-
-```yaml
-# ~/.lingti.yaml
-platforms:
-  webapp:
-    port: 8080
-```
-
-**环境变量：**
-
-```bash
-export WEBAPP_PORT=8080
-lingti-bot router --provider deepseek --api-key sk-xxx
-```
 
 ## Sponsors
 
