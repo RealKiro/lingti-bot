@@ -20,7 +20,7 @@
 
 **macOS / Linux / WSL:**
 ```bash
-curl -fsSL https://cli.lingti.com/install.sh | bash -s -- --bot
+curl -fsSL https://files.lingti.com/install-bot.sh | bash
 ```
 
 **Windows (PowerShell):**
