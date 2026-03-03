@@ -19,13 +19,14 @@
 - 🌐 **[社交平台自动化](docs/social-platform-automation.md)** — 通过 MCP + Chrome 浏览器能力，AI 代操作知乎、小红书等内容平台，自动发帖、评论、互动，解放运营双手
 - 🛠️ **75+ MCP 工具** — 覆盖文件、Shell、系统、网络、日历、Git、GitHub 等全场景
 - 🌏 **中国平台原生支持** — 钉钉、飞书、企业微信、微信公众号开箱即用
+- 💬 **[内置 Web 聊天界面](#web-chat-ui)** — 无需任何客户端，浏览器直开，支持**多会话并行**，每个会话独立记忆，刷新不丢失
 - 🔌 **嵌入式友好** — 可编译到 ARM/MIPS，轻松部署到树莓派、路由器、NAS
 - 🧠 **多 AI 后端** — 集成 Claude、DeepSeek、Kimi、MiniMax、Gemini 等 [16 种 AI 服务](AI-PROVIDERS.md)，按需切换，支持[按平台/频道指定不同模型](#per-channel-model)
 - 🔬 **Claude 深度思考** — 原生支持 Claude Extended Thinking API，`/think high` 即可启用真正的链式推理
 - 🐳 **Docker 部署** — 提供 Dockerfile 和 docker-compose.yml，一键容器化部署
 - 🩺 **健康诊断** — `lingti-bot doctor` 一键检查配置、连接、依赖，快速定位问题
 
-支持企业微信、飞书、钉钉、Slack、Telegram、Discord、WhatsApp、LINE、Teams 等 [19 种聊天平台](docs/chat-platforms.md) 接入，既可通过**云中继 5 分钟秒接**，也可 [OpenClaw](docs/openclaw-reference.md) 式**传统自建部署**。查看 [开发路线图](docs/roadmap.md) 了解更多功能规划。
+支持企业微信、飞书、钉钉、Slack、Telegram、Discord、WhatsApp、LINE、Teams 等 [19 种聊天平台](docs/chat-platforms.md) 接入，以及内置**浏览器 Web 聊天界面**（多会话并行），既可通过**云中继 5 分钟秒接**，也可 [OpenClaw](docs/openclaw-reference.md) 式**传统自建部署**。查看 [开发路线图](docs/roadmap.md) 了解更多功能规划。
 
 > 🐕⚡ **为什么叫"灵小缇"？** 灵缇犬（Greyhound）是世界上跑得最快的犬，以敏捷、忠诚著称。灵小缇同样敏捷高效，是你忠实的 AI 助手。
 
@@ -295,6 +296,7 @@ make build
 | **NOSTR** | WebSocket Relays | 自建 | 🔜 计划中 | ✅ |
 | **Zalo** | Webhook + REST | 自建 | 🔜 计划中 | ✅ |
 | **Nextcloud Talk** | HTTP Polling | 自建 | 🔜 计划中 | ✅ |
+| **Web 聊天界面** | WebSocket | `--webapp-port` | — | ✅ |
 
 > 文件发送详情（配置方法、支持的文件类型、限制）：[文件发送指南](docs/file-sending.md)
 
@@ -492,6 +494,7 @@ lingti-bot skills info github
 |------|------|------|
 | **MCP Server** | 标准 MCP 协议服务器 | 兼容 Claude Desktop、Cursor、Windsurf 等所有 MCP 客户端 |
 | **多平台消息网关** | [19 种聊天平台](docs/chat-platforms.md) | 微信公众号、企业微信、Slack、飞书一键接入，支持云中继 |
+| **[Web 聊天界面](#web-chat-ui)** | 内置浏览器 UI | 多会话并行，独立记忆隔离，Markdown 渲染，`--webapp-port` 一键启用 |
 | **MCP 工具集** | 75+ 本地系统工具 | 文件、Shell、系统、网络、日历、Git、GitHub 等全覆盖 |
 | **Skills** | 模块化能力扩展 | 8 个内置 Skill，支持自定义和项目级扩展 |
 | **智能对话** | 多轮对话与记忆 | 上下文记忆、[16 种 AI 后端](AI-PROVIDERS.md)、按平台模型切换 |
@@ -597,6 +600,53 @@ lingti-bot router \
 2. 在应用详情页获取 AppKey (ClientID) 和 AppSecret (ClientSecret)
 3. 开启机器人功能，配置消息接收模式为 **Stream 模式**
 4. 运行上述命令即可
+
+### <a id="web-chat-ui"></a>内置 Web 聊天界面 — 浏览器直开，零配置
+
+无需微信、无需 Slack，一个参数即可在本地浏览器中打开完整聊天界面：
+
+```bash
+lingti-bot router --provider deepseek --api-key sk-xxx --webapp-port 8080
+# 打开浏览器访问 http://localhost:8080
+```
+
+**核心特性：**
+
+| 特性 | 说明 |
+|------|------|
+| **多会话并行** | 左侧边栏管理多个独立会话，每个会话有独立的 AI 记忆上下文，互不干扰 |
+| **并发处理** | 在会话 A 等待长任务时，立即切换到会话 B 发送新消息——两者并行处理 |
+| **会话持久化** | 所有会话列表和聊天记录保存在浏览器 `localStorage`，刷新页面不丢失 |
+| **Markdown 渲染** | AI 回复支持完整 Markdown：代码块、表格、列表、加粗等 |
+| **端口自动切换** | 若指定端口被占用，自动递增尝试直到找到空闲端口 |
+| **无需额外安装** | 纯 HTML + 原生 JS，内嵌于二进制，无 Node.js / npm 依赖 |
+
+**多会话并行示意：**
+
+```
+浏览器
+├── 会话 A（UUID-1）── AI 正在处理长任务...
+├── 会话 B（UUID-2）── 刚发了新消息，AI 立即响应
+└── 会话 C（UUID-3）── 历史记录，随时可查
+```
+
+每个会话对应一个独立 `channelID`，AI 记忆完全隔离——在会话 A 说的内容不会影响会话 B 的上下文。
+
+**通过配置文件启用：**
+
+```yaml
+# ~/.lingti.yaml
+platforms:
+  webapp:
+    port: 8080
+```
+
+**环境变量：**
+
+```bash
+export WEBAPP_PORT=8080
+lingti-bot router --provider deepseek --api-key sk-xxx
+```
 
 ## Sponsors
 
@@ -748,6 +798,7 @@ lingti-bot router \
 | **NOSTR** | WebSocket Relays | ✅ 已支持 |
 | **Zalo** | Webhook + REST | ✅ 已支持 |
 | **Nextcloud Talk** | HTTP Polling | ✅ 已支持 |
+| **Web 聊天界面** | WebSocket (内置) | ✅ 已支持 |
 
 > 完整列表：[聊天平台列表](docs/chat-platforms.md)
 

@@ -18,13 +18,14 @@ English | [中文](./README.md)
 - 🤖 **Browser Automation** — Built-in CDP protocol control, snapshot-then-act pattern, no Puppeteer/Playwright installation
 - 🛠️ **75+ MCP Tools** — Covers files, Shell, system, network, calendar, Git, GitHub, and more
 - 🌏 **China Platform Native** — DingTalk, Feishu, WeCom, WeChat Official Account ready out-of-box
+- 💬 **Built-in Web Chat UI** — Open in any browser, no client needed. Supports **multiple simultaneous sessions** each with isolated AI memory, persists across page refreshes
 - 🔌 **Embedded Friendly** — Compile to ARM/MIPS, easy deployment to Raspberry Pi, routers, NAS
 - 🧠 **Multi-AI Backend** — [16 AI providers](AI-PROVIDERS.md) including Claude, DeepSeek, Kimi, MiniMax, Gemini, OpenAI, with per-platform/channel model overrides
 - 🔬 **Claude Extended Thinking** — Native Anthropic Thinking API support, real chain-of-thought reasoning via `/think high`
 - 🐳 **Docker Support** — Multi-stage Dockerfile and docker-compose.yml for containerized deployment
 - 🩺 **Health Diagnostics** — `lingti-bot doctor` checks config, connectivity, dependencies in one command
 
-Supports WeCom, Feishu, DingTalk, Slack, Telegram, Discord, WhatsApp, LINE, Teams, and more — [19 chat platforms](docs/chat-platforms.md) in total. Either **5-minute cloud relay** or [OpenClaw](docs/openclaw-reference.md)-style **self-hosted deployment**. Check [Roadmap](docs/roadmap.md) for more features.
+Supports WeCom, Feishu, DingTalk, Slack, Telegram, Discord, WhatsApp, LINE, Teams, and more — [19 chat platforms](docs/chat-platforms.md) in total — plus a built-in **browser Web Chat UI** with multiple parallel sessions. Either **5-minute cloud relay** or [OpenClaw](docs/openclaw-reference.md)-style **self-hosted deployment**. Check [Roadmap](docs/roadmap.md) for more features.
 
 > 🐕⚡ **Why "Lingti"?** Lingti (灵缇) means Greyhound in Chinese - the fastest dog in the world, known for agility and loyalty. Lingti Bot is equally agile and efficient, your faithful AI assistant.
 
@@ -181,6 +182,7 @@ In addition to MCP mode, lingti-bot can also run as a **message router**, connec
 | **NOSTR** | WebSocket Relays | Self-hosted | 🔜 Planned | ✅ |
 | **Zalo** | Webhook + REST | Self-hosted | 🔜 Planned | ✅ |
 | **Nextcloud Talk** | HTTP Polling | Self-hosted | 🔜 Planned | ✅ |
+| **Web Chat UI** | WebSocket (built-in) | `--webapp-port` | — | ✅ |
 
 > File sending details (setup, supported types, limitations): [File Sending Guide](docs/file-sending.md)
 
@@ -262,6 +264,51 @@ cron_create(
 - `30 8-18 * * *` - Every hour from 8:30 to 18:30
 
 Task configuration saved to `~/.lingti.db` (SQLite), auto-resume after MCP service restart.
+
+### Built-in Web Chat UI — Open in Any Browser
+
+No client apps needed. Start the web chat interface with a single flag:
+
+```bash
+lingti-bot router --provider deepseek --api-key sk-xxx --webapp-port 8080
+# Open http://localhost:8080
+```
+
+**Key features:**
+
+| Feature | Details |
+|---------|---------|
+| **Multiple simultaneous sessions** | Each session in the sidebar is fully independent — talk to the bot on different tasks at the same time without interference |
+| **Isolated memory per session** | Each session has its own `channelID` → separate AI conversation history. What you say in session A never bleeds into session B |
+| **True parallel processing** | Start a long task in session A, immediately switch to session B and send a new message — both are processed concurrently |
+| **Session persistence** | Session list and chat history are saved in browser `localStorage` — survive page refreshes and browser restarts |
+| **Markdown rendering** | Bot replies render full Markdown: code blocks with syntax hints, tables, lists, bold/italic |
+| **Auto port increment** | If the configured port is busy, automatically tries the next port until one is free |
+| **Zero extra dependencies** | UI is a single embedded HTML file — no Node.js, no npm, no build step |
+
+**Multiple sessions in action:**
+
+```
+Browser tab (http://localhost:8080)
+├── Session A  ── "Analyze this CSV file..." (AI still working)
+├── Session B  ── "Write a poem about cats" (AI responded instantly)
+└── Session C  ── Yesterday's conversation (still accessible)
+```
+
+**Via config file:**
+
+```yaml
+# ~/.lingti.yaml
+platforms:
+  webapp:
+    port: 8080
+```
+
+**Via environment variable:**
+
+```bash
+WEBAPP_PORT=8080 lingti-bot router --provider deepseek --api-key sk-xxx
+```
 
 ### Skills — Modular Capability Packs
 
