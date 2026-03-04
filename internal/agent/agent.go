@@ -48,6 +48,9 @@ type Config struct {
 	MaxToolRounds      int      // Max tool-call iterations per message (0 = use default 100)
 	CallTimeoutSecs    int      // Base timeout in seconds for each AI API call (0 = use default 90s base)
 	MCPServers         []mcpclient.ServerConfig // External MCP servers to connect to
+	AllowTools         []string // Tool whitelist; empty = allow all
+	DenyTools          []string // Tool blacklist; applied after allowlist
+	Workspace          string   // Working directory for this agent
 }
 
 // New creates a new Agent with the specified provider

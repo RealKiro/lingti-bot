@@ -20,6 +20,8 @@ type Config struct {
 	Relay     RelayConfig               `yaml:"relay,omitempty"`
 	Skills    SkillsConfig              `yaml:"skills,omitempty"`
 	Browser   BrowserConfig             `yaml:"browser,omitempty"`
+	Agents    []AgentEntry              `yaml:"agents,omitempty"`
+	Bindings  []AgentBinding            `yaml:"bindings,omitempty"`
 }
 
 // ProviderEntry defines a named AI provider configuration.
@@ -78,6 +80,36 @@ type AIOverride struct {
 	APIKey    string `yaml:"api_key,omitempty"`
 	BaseURL   string `yaml:"base_url,omitempty"`
 	Model     string `yaml:"model,omitempty"`
+}
+
+// AgentEntry defines a named agent with its own AI provider, model, and instructions.
+type AgentEntry struct {
+	ID           string   `yaml:"id"`
+	Name         string   `yaml:"name,omitempty"`
+	Default      bool     `yaml:"default,omitempty"`
+	Provider     string   `yaml:"provider,omitempty"`
+	APIKey       string   `yaml:"api_key,omitempty"`
+	BaseURL      string   `yaml:"base_url,omitempty"`
+	Model        string   `yaml:"model,omitempty"`
+	Instructions string   `yaml:"instructions,omitempty"` // inline text or path to a file
+	Workspace    string   `yaml:"workspace,omitempty"`    // workspace directory for this agent
+	AllowTools   []string `yaml:"allow_tools,omitempty"`  // whitelist; empty = allow all
+	DenyTools    []string `yaml:"deny_tools,omitempty"`   // blacklist; checked after allowlist
+}
+
+// AgentBindingMatch holds the filter criteria for a binding.
+// All non-empty fields must match for the binding to apply.
+type AgentBindingMatch struct {
+	Platform  string `yaml:"platform,omitempty"`
+	ChannelID string `yaml:"channel_id,omitempty"`
+	UserID    string `yaml:"user_id,omitempty"`
+}
+
+// AgentBinding maps a match pattern to an agent ID.
+type AgentBinding struct {
+	AgentID string            `yaml:"agent_id"`
+	Comment string            `yaml:"comment,omitempty"`
+	Match   AgentBindingMatch `yaml:"match"`
 }
 
 type AIConfig struct {
@@ -175,6 +207,52 @@ func applyOverride(base AIConfig, o AIOverride) AIConfig {
 	}
 	base.Overrides = nil // don't propagate
 	return base
+}
+
+// ResolveAgentAI returns the effective AIConfig for a named agent entry,
+// inheriting from the base AI config for any fields left empty in the entry.
+func (c *Config) ResolveAgentAI(entry AgentEntry) AIConfig {
+	base := c.AI
+	if entry.Provider != "" && entry.Provider != base.Provider {
+		base.Provider = entry.Provider
+		base.BaseURL = ""
+		base.Model = ""
+	}
+	if entry.APIKey != "" {
+		base.APIKey = entry.APIKey
+	}
+	if entry.BaseURL != "" {
+		base.BaseURL = entry.BaseURL
+	}
+	if entry.Model != "" {
+		base.Model = entry.Model
+	}
+	base.Overrides = nil
+	return base
+}
+
+// FindAgent looks up an AgentEntry by ID.
+func (c *Config) FindAgent(id string) (AgentEntry, bool) {
+	for _, a := range c.Agents {
+		if a.ID == id {
+			return a, true
+		}
+	}
+	return AgentEntry{}, false
+}
+
+// DefaultAgentID returns the ID of the agent marked default:true,
+// falling back to the first agent in the list, or "" if the list is empty.
+func (c *Config) DefaultAgentID() string {
+	for _, a := range c.Agents {
+		if a.Default {
+			return a.ID
+		}
+	}
+	if len(c.Agents) > 0 {
+		return c.Agents[0].ID
+	}
+	return ""
 }
 
 type PlatformConfig struct {

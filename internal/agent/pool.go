@@ -3,11 +3,13 @@ package agent
 import (
 	"context"
 	"fmt"
+	"os"
 	"sync"
 
 	"github.com/pltanton/lingti-bot/internal/config"
 	"github.com/pltanton/lingti-bot/internal/logger"
 	"github.com/pltanton/lingti-bot/internal/router"
+	"github.com/pltanton/lingti-bot/internal/routing"
 )
 
 // AgentPool manages multiple agents for per-platform/channel model overrides.
@@ -41,14 +43,15 @@ func (p *AgentPool) HandleMessage(ctx context.Context, msg router.Message) (rout
 		return p.defaultAgent.HandleMessage(ctx, msg)
 	}
 
-	// Try named providers first (new format)
-	if len(p.fullCfg.Providers) > 0 {
-		// For now, named providers are selected at startup via relay.provider / --provider.
-		// Per-message routing by named provider can be added later.
-		return p.defaultAgent.HandleMessage(ctx, msg)
+	// --- NEW PATH: agents[] + bindings[] system ---
+	if len(p.fullCfg.Agents) > 0 {
+		return p.handleWithAgentRouting(ctx, msg)
 	}
 
-	// Legacy: ai.overrides resolution
+	// --- LEGACY PATH: named providers or ai.overrides ---
+	if len(p.fullCfg.Providers) > 0 {
+		return p.defaultAgent.HandleMessage(ctx, msg)
+	}
 	if len(p.fullCfg.AI.Overrides) == 0 {
 		return p.defaultAgent.HandleMessage(ctx, msg)
 	}
@@ -58,20 +61,122 @@ func (p *AgentPool) HandleMessage(ctx context.Context, msg router.Message) (rout
 		platform = ap
 	}
 	resolved := p.fullCfg.ResolveAI(platform, msg.ChannelID)
-	// If resolved config matches default, use default agent
 	if resolved.Provider == p.fullCfg.AI.Provider &&
 		resolved.APIKey == p.fullCfg.AI.APIKey &&
 		resolved.Model == p.fullCfg.AI.Model {
 		return p.defaultAgent.HandleMessage(ctx, msg)
 	}
 
-	agent := p.getOrCreate(resolved)
-	if agent == nil {
+	a := p.getOrCreate(resolved)
+	if a == nil {
 		return p.defaultAgent.HandleMessage(ctx, msg)
 	}
-	return agent.HandleMessage(ctx, msg)
+	return a.HandleMessage(ctx, msg)
 }
 
+// handleWithAgentRouting uses the routing package to pick a named agent.
+func (p *AgentPool) handleWithAgentRouting(ctx context.Context, msg router.Message) (router.Response, error) {
+	platform := msg.Platform
+	if ap, ok := msg.Metadata["actual_platform"]; ok && ap != "" {
+		platform = ap
+	}
+
+	result := routing.ResolveRoute(p.fullCfg, platform, msg.ChannelID, msg.UserID)
+
+	agentID := result.AgentID
+	if agentID == "" {
+		agentID = p.fullCfg.DefaultAgentID()
+	}
+
+	if agentID == "" {
+		return p.defaultAgent.HandleMessage(ctx, msg)
+	}
+
+	entry, found := p.fullCfg.FindAgent(agentID)
+	if !found {
+		logger.Warn("[AgentPool] Binding references unknown agent %q, using default", agentID)
+		return p.defaultAgent.HandleMessage(ctx, msg)
+	}
+
+	if result.MatchedBy != "" {
+		logger.Info("[AgentPool] Routing to agent %q (matched: %s)", agentID, result.MatchedBy)
+	} else {
+		logger.Info("[AgentPool] Routing to default agent %q", agentID)
+	}
+
+	a := p.getOrCreateByID(agentID, entry)
+	if a == nil {
+		return p.defaultAgent.HandleMessage(ctx, msg)
+	}
+	return a.HandleMessage(ctx, msg)
+}
+
+// getOrCreateByID looks up or lazily creates an agent by its named ID.
+func (p *AgentPool) getOrCreateByID(id string, entry config.AgentEntry) *Agent {
+	p.mu.RLock()
+	if a, ok := p.agents[id]; ok {
+		p.mu.RUnlock()
+		return a
+	}
+	p.mu.RUnlock()
+
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if a, ok := p.agents[id]; ok {
+		return a
+	}
+
+	aiCfg := p.fullCfg.ResolveAgentAI(entry)
+
+	// Resolve instructions: treat as file path when it starts with / or .
+	instructions := entry.Instructions
+	if len(instructions) > 0 && (instructions[0] == '/' || instructions[0] == '.') {
+		if data, err := os.ReadFile(instructions); err == nil {
+			instructions = string(data)
+		} else {
+			logger.Warn("[AgentPool] Could not read instructions file %q for agent %q: %v", instructions, id, err)
+		}
+	}
+
+	cfg := p.baseCfg
+	cfg.Provider = aiCfg.Provider
+	cfg.APIKey = aiCfg.APIKey
+	cfg.BaseURL = aiCfg.BaseURL
+	cfg.Model = aiCfg.Model
+	if instructions != "" {
+		cfg.CustomInstructions = instructions
+	}
+	if len(entry.AllowTools) > 0 {
+		cfg.AllowTools = entry.AllowTools
+	}
+	if len(entry.DenyTools) > 0 {
+		cfg.DenyTools = entry.DenyTools
+	}
+	if entry.Workspace != "" {
+		cfg.Workspace = entry.Workspace
+	}
+
+	a, err := New(cfg)
+	if err != nil {
+		logger.Error("[AgentPool] Failed to create agent %q: %v", id, err)
+		return nil
+	}
+
+	if p.defaultAgent.cronScheduler != nil {
+		a.SetCronScheduler(p.defaultAgent.cronScheduler)
+	}
+
+	name := entry.Name
+	if name == "" {
+		name = id
+	}
+	logger.Info("[AgentPool] Created agent %q (provider=%s model=%s)", name, aiCfg.Provider, aiCfg.Model)
+	p.agents[id] = a
+	return a
+}
+
+// getOrCreate is the legacy path keyed by provider+key+model string.
 func (p *AgentPool) getOrCreate(aiCfg config.AIConfig) *Agent {
 	key := fmt.Sprintf("%s:%s:%s", aiCfg.Provider, aiCfg.APIKey, aiCfg.Model)
 
@@ -85,7 +190,6 @@ func (p *AgentPool) getOrCreate(aiCfg config.AIConfig) *Agent {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	// Double-check
 	if a, ok := p.agents[key]; ok {
 		return a
 	}
@@ -102,7 +206,6 @@ func (p *AgentPool) getOrCreate(aiCfg config.AIConfig) *Agent {
 		return nil
 	}
 
-	// Share cron scheduler from default agent
 	if p.defaultAgent.cronScheduler != nil {
 		a.SetCronScheduler(p.defaultAgent.cronScheduler)
 	}
