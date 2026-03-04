@@ -106,7 +106,7 @@ Even with `--yes`, these are still blocked:
 lingti-bot --yes router --provider deepseek --api-key sk-xxx
 
 # ❌ Wrong - after subcommand
-lingti-bot router --yes --provider deepseek --api-key sk-xxx
+lingti-bot gateway --yes --provider deepseek --api-key sk-xxx
 ```
 
 ## Verify It's Working
@@ -204,7 +204,7 @@ AI: ✅ Deleted 142 log files (saved 3.2 GB)
 lingti-bot --help
 
 # Show router-specific flags
-lingti-bot router --help
+lingti-bot gateway --help
 
 # Check version
 lingti-bot version

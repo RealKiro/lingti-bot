@@ -94,13 +94,13 @@ export ANTHROPIC_API_KEY="sk-ant-your-api-key"
 export ANTHROPIC_BASE_URL="https://your-proxy.com/v1"  # Custom API base URL
 export ANTHROPIC_MODEL="claude-sonnet-4-20250514"       # Specify model
 
-lingti-bot router
+lingti-bot gateway
 ```
 
 ### Using Command-Line Flags
 
 ```bash
-lingti-bot router \
+lingti-bot gateway \
   --slack-bot-token "xoxb-your-bot-token" \
   --slack-app-token "xapp-your-app-token" \
   --api-key "sk-ant-your-api-key" \
@@ -123,7 +123,7 @@ ANTHROPIC_MODEL=claude-sonnet-4-20250514
 Then run:
 
 ```bash
-source .env && lingti-bot router
+source .env && lingti-bot gateway
 ```
 
 ## Step 7: Test the Integration
@@ -152,7 +152,7 @@ Once connected, the bot can:
 ### Bot not responding
 
 1. Check that all three tokens are set correctly
-2. Verify the bot is running: `lingti-bot router`
+2. Verify the bot is running: `lingti-bot gateway`
 3. Check logs for errors
 
 ### "not_authed" error
@@ -229,7 +229,7 @@ Type=simple
 Environment=SLACK_BOT_TOKEN=xoxb-...
 Environment=SLACK_APP_TOKEN=xapp-...
 Environment=ANTHROPIC_API_KEY=sk-ant-...
-ExecStart=/usr/local/bin/lingti-bot router
+ExecStart=/usr/local/bin/lingti-bot gateway
 Restart=always
 RestartSec=5
 

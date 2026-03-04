@@ -177,7 +177,7 @@ curl -fsSL https://files.lingti.com/install-bot.sh | bash
 irm https://cli.lingti.com/install.ps1 -OutFile install.ps1; .\install.ps1 -Bot
 
 # 2. 启动服务
-lingti-bot router \
+lingti-bot gateway \
   --wecom-corp-id YOUR_CORP_ID \
   --wecom-agent-id YOUR_AGENT_ID \
   --wecom-secret YOUR_SECRET \
@@ -210,7 +210,7 @@ export AI_API_KEY="your-api-key"
 export AI_BASE_URL="https://api.deepseek.com/v1"
 export AI_MODEL="deepseek-chat"
 
-lingti-bot router
+lingti-bot gateway
 ```
 
 ### 方式三：使用 HTTPS（可选）
@@ -255,7 +255,7 @@ lingti-bot 会自动处理验证请求，解密 echostr 并返回明文。
 
 ```bash
 # 查看详细日志
-lingti-bot router --log verbose ...
+lingti-bot gateway --log verbose ...
 ```
 
 ## 架构说明
@@ -285,7 +285,7 @@ lingti-bot router --log verbose ...
 ```
 ┌──────────────┐     ┌─────────────────────────────┐     ┌──────────────┐
 │  企业微信     │     │    公网服务器                │     │   AI 模型    │
-│  用户消息     │ ──▶ │  lingti-bot router          │ ──▶ │  处理响应    │
+│  用户消息     │ ──▶ │  lingti-bot gateway          │ ──▶ │  处理响应    │
 │              │     │  http://IP:8080/wecom/callback │    │              │
 └──────────────┘     └─────────────────────────────┘     └──────────────┘
        ▲                          │
@@ -321,7 +321,7 @@ lingti-bot router --log verbose ...
 ### 使用 nohup
 
 ```bash
-nohup lingti-bot router \
+nohup lingti-bot gateway \
   --wecom-corp-id ... \
   --wecom-port 8080 \
   ... > /var/log/lingti-bot.log 2>&1 &
@@ -349,7 +349,7 @@ Environment="AI_PROVIDER=deepseek"
 Environment="AI_API_KEY=your-api-key"
 Environment="AI_BASE_URL=https://api.deepseek.com/v1"
 Environment="AI_MODEL=deepseek-chat"
-ExecStart=/usr/local/bin/lingti-bot router
+ExecStart=/usr/local/bin/lingti-bot gateway
 Restart=always
 RestartSec=5
 
@@ -380,7 +380,7 @@ sudo systemctl status lingti-bot
 1. 确保服务器公网可访问，防火墙开放端口
 2. 检查 Token 和 EncodingAESKey 配置是否正确（注意复制时不要有空格）
 3. 确保 lingti-bot 已启动并监听正确端口
-4. 查看日志：`lingti-bot router --log verbose`
+4. 查看日志：`lingti-bot gateway --log verbose`
 
 ### Q: 收不到消息？
 

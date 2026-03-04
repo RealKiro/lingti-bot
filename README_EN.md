@@ -77,7 +77,7 @@ lingti-bot relay --platform wecom --provider deepseek --api-key sk-xxx
 </tr>
 </table>
 
-<summary>📺 <b>Background Running Demo</b> — <code>make && dist/lingti-bot router</code></summary>
+<summary>📺 <b>Background Running Demo</b> — <code>make && dist/lingti-bot gateway</code></summary>
 <br>
 <img src="docs/images/demo-terminal.png" alt="Terminal Demo" />
 <p><sub>Clone, compile and run directly, paired with DeepSeek model, processing DingTalk messages in real-time</sub></p>
@@ -98,7 +98,7 @@ Unlike traditional Bot frameworks that require Docker, databases, or complex run
 # Clone, compile, run
 git clone https://github.com/ruilisi/lingti-bot.git
 cd lingti-bot && make
-./dist/lingti-bot router --provider deepseek --api-key sk-xxx
+./dist/lingti-bot gateway --provider deepseek --api-key sk-xxx
 ```
 
 ### Single Binary
@@ -270,7 +270,7 @@ Task configuration saved to `~/.lingti.db` (SQLite), auto-resume after MCP servi
 No client apps needed. Start the web chat interface with a single flag:
 
 ```bash
-lingti-bot router --provider deepseek --api-key sk-xxx --webapp-port 8080
+lingti-bot gateway --provider deepseek --api-key sk-xxx --webapp-port 8080
 # Open http://localhost:8080
 ```
 
@@ -311,7 +311,7 @@ platforms:
 **Via environment variable:**
 
 ```bash
-WEBAPP_PORT=8080 lingti-bot router --provider deepseek --api-key sk-xxx
+WEBAPP_PORT=8080 lingti-bot gateway --provider deepseek --api-key sk-xxx
 ```
 
 ### Skills — Modular Capability Packs
@@ -359,7 +359,7 @@ Supports **15 AI providers** covering mainstream LLM platforms globally:
 
 ```bash
 # Specify provider via command line
-lingti-bot router --provider qwen --api-key "sk-xxx" --model "qwen-plus"
+lingti-bot gateway --provider qwen --api-key "sk-xxx" --model "qwen-plus"
 
 # Override default model
 lingti-bot relay --provider openai --api-key "sk-xxx" --model "gpt-4o-mini"

@@ -71,14 +71,14 @@
 
 > **注意**：飞书要求应用先与平台建立首次通信，之后才能在后台配置长连接模式。如果跳过此步骤，第六步的长连接选项将无法设置。
 
-1. 使用第二步获取的 App ID 和 App Secret，启动一次 lingti-bot router：
+1. 使用第二步获取的 App ID 和 App Secret，启动一次 lingti-bot gateway：
 
 ```bash
 export FEISHU_APP_ID="cli_your_app_id"
 export FEISHU_APP_SECRET="your_app_secret"
 export ANTHROPIC_API_KEY="sk-ant-your-api-key"
 
-lingti-bot router
+lingti-bot gateway
 ```
 
 2. 观察日志输出，确认已尝试连接飞书
@@ -128,13 +128,13 @@ export ANTHROPIC_API_KEY="sk-ant-your-api-key"
 export ANTHROPIC_BASE_URL="https://your-proxy.com/v1"  # 自定义 API 地址
 export ANTHROPIC_MODEL="claude-sonnet-4-20250514"       # 指定模型
 
-lingti-bot router
+lingti-bot gateway
 ```
 
 ### 使用命令行参数
 
 ```bash
-lingti-bot router \
+lingti-bot gateway \
   --feishu-app-id "cli_your_app_id" \
   --feishu-app-secret "your_app_secret" \
   --api-key "sk-ant-your-api-key" \
@@ -157,7 +157,7 @@ ANTHROPIC_MODEL=claude-sonnet-4-20250514
 然后运行：
 
 ```bash
-source .env && lingti-bot router
+source .env && lingti-bot gateway
 ```
 
 ### 同时运行 Slack 和飞书
@@ -173,7 +173,7 @@ export ANTHROPIC_API_KEY="sk-ant-..."
 export ANTHROPIC_BASE_URL="https://your-proxy.com/v1"  # 可选
 export ANTHROPIC_MODEL="claude-sonnet-4-20250514"       # 可选
 
-lingti-bot router
+lingti-bot gateway
 ```
 
 ## 第十步：测试集成
@@ -305,7 +305,7 @@ Type=simple
 Environment=FEISHU_APP_ID=cli_...
 Environment=FEISHU_APP_SECRET=...
 Environment=ANTHROPIC_API_KEY=sk-ant-...
-ExecStart=/usr/local/bin/lingti-bot router
+ExecStart=/usr/local/bin/lingti-bot gateway
 Restart=always
 RestartSec=5
 

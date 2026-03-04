@@ -16,7 +16,7 @@ export DINGTALK_CLIENT_ID="your-app-key"
 export DINGTALK_CLIENT_SECRET="your-app-secret"
 export AI_PROVIDER="deepseek"
 export AI_API_KEY="sk-xxx"
-lingti-bot router
+lingti-bot gateway
 ```
 
 ## 架构图
@@ -101,13 +101,13 @@ export AI_PROVIDER="deepseek"                # 或 claude、kimi
 export AI_API_KEY="sk-xxx"
 
 # 启动
-lingti-bot router
+lingti-bot gateway
 ```
 
 #### 命令行参数方式
 
 ```bash
-lingti-bot router \
+lingti-bot gateway \
   --dingtalk-client-id "dingxxxxxx" \
   --dingtalk-client-secret "xxxxxxxx" \
   --provider deepseek \

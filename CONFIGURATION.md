@@ -229,14 +229,14 @@ lingti-bot relay --provider qwen --model qwen-plus
 AI_API_KEY=sk-xxx TELEGRAM_BOT_TOKEN=xxx docker compose up -d
 
 # 或直接 docker run
-docker run -e AI_PROVIDER=deepseek -e AI_API_KEY=sk-xxx lingti-bot router
+docker run -e AI_PROVIDER=deepseek -e AI_API_KEY=sk-xxx lingti-bot gateway
 ```
 
 挂载配置文件以使用 overrides 和其他高级功能：
 
 ```bash
 docker run -v ~/.lingti.yaml:/root/.lingti.yaml:ro \
-  -e AI_API_KEY=sk-xxx lingti-bot router
+  -e AI_API_KEY=sk-xxx lingti-bot gateway
 ```
 
 ### 多实例运行：命令行参数覆盖

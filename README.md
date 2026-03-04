@@ -69,7 +69,7 @@ lingti-bot relay --platform wecom --provider deepseek --api-key sk-xxx
 无需微信、无需 Slack，一个参数即可在本地浏览器中打开完整聊天界面：
 
 ```bash
-lingti-bot router --provider deepseek --api-key sk-xxx --webapp-port 8080
+lingti-bot gateway --provider deepseek --api-key sk-xxx --webapp-port 8080
 # 打开浏览器访问 http://localhost:8080
 ```
 
@@ -112,7 +112,7 @@ platforms:
 
 ```bash
 export WEBAPP_PORT=8080
-lingti-bot router --provider deepseek --api-key sk-xxx
+lingti-bot gateway --provider deepseek --api-key sk-xxx
 ```
 
 ---
@@ -131,7 +131,7 @@ lingti-bot router --provider deepseek --api-key sk-xxx
 </tr>
 </table>
 
-<summary>📺 <b>后台运行演示</b> — <code>make && dist/lingti-bot router</code></summary>
+<summary>📺 <b>后台运行演示</b> — <code>make && dist/lingti-bot gateway</code></summary>
 <br>
 <img src="docs/images/demo-terminal.png" alt="Terminal Demo" />
 <p><sub>克隆代码后直接编译运行，配合 DeepSeek 模型，实时处理钉钉消息</sub></p>
@@ -276,7 +276,7 @@ lingti-bot 将**简洁性**作为最高设计原则：
 # 克隆即编译，编译即运行
 git clone https://github.com/ruilisi/lingti-bot.git
 cd lingti-bot && make
-./dist/lingti-bot router --provider deepseek --api-key sk-xxx
+./dist/lingti-bot gateway --provider deepseek --api-key sk-xxx
 ```
 
 ### 单一二进制
@@ -624,7 +624,7 @@ lingti-bot relay --platform wecom \
 
 ```bash
 # 一条命令搞定
-lingti-bot router \
+lingti-bot gateway \
   --dingtalk-client-id YOUR_APP_KEY \
   --dingtalk-client-secret YOUR_APP_SECRET \
   --provider deepseek \
@@ -808,7 +808,7 @@ export FEISHU_APP_ID="cli_..."
 export FEISHU_APP_SECRET="..."
 
 # 启动网关
-./lingti-bot router
+./lingti-bot gateway
 ```
 
 ### 多 AI 后端
@@ -838,7 +838,7 @@ export FEISHU_APP_SECRET="..."
 
 ```bash
 # 使用命令行参数指定
-lingti-bot router --provider qwen --api-key "sk-xxx" --model "qwen-plus"
+lingti-bot gateway --provider qwen --api-key "sk-xxx" --model "qwen-plus"
 
 # 覆盖默认模型
 lingti-bot relay --provider openai --api-key "sk-xxx" --model "gpt-4o-mini"

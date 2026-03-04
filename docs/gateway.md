@@ -1,72 +1,228 @@
 # Gateway
 
-The **gateway** is a local WebSocket server that exposes the lingti-bot AI agent to any custom client — web UIs, mobile apps, scripts, or other tools — over a simple JSON protocol.
-
-Instead of a specific messaging platform (Telegram, WeCom), the gateway gives you a raw API: connect a WebSocket, send chat messages, and stream back AI responses. You keep full control of the UI.
-
-## Why use the gateway?
-
-| Use case | Example |
-|----------|---------|
-| Custom web UI | React chat interface connected to your local AI |
-| Mobile companion app | iOS/Android app that talks to lingti-bot |
-| CLI tooling | Shell scripts that query the AI agent |
-| Relay bridge | Other bots that forward messages to lingti-bot |
-| Automation | Headless scripts that drive the agent programmatically |
-
-## Starting the gateway
+The **gateway** is the unified run command for lingti-bot. It starts all configured platform bots (Telegram, Slack, Discord, etc.) **and** a WebSocket API server in a single process.
 
 ```bash
 lingti-bot gateway --api-key sk-ant-xxx
 ```
 
-The gateway listens on `:18789` by default. Change it with `--addr`:
+On startup the gateway:
+1. Loads `~/.lingti.yaml` for platform credentials, agent definitions, and routing bindings
+2. Registers all configured platforms as bot listeners
+3. Starts the WebSocket server on `:18789` (use `--no-ws` to disable)
+4. Routes each incoming message to the correct agent based on bindings
+5. Writes `~/.lingti/gateway.pid` so `gateway restart` can reload config without a full restart
+
+## Quick Start
 
 ```bash
-lingti-bot gateway --addr :9000 --api-key sk-ant-xxx
+# 1. Save credentials (once)
+lingti-bot channels add --channel telegram --token 123456:ABC-xxx
+lingti-bot channels add --channel slack --bot-token xoxb-... --app-token xapp-...
+
+# 2. (Optional) Define agents and routing
+lingti-bot agents add main --default
+lingti-bot agents bind --bind telegram
+
+# 3. Start
+lingti-bot gateway --api-key sk-ant-xxx
 ```
 
-All flags also accept environment variables — see the [CLI reference](../docs/cli-reference.md) for the full table.
+## Managing Channels
 
-## Authentication
-
-By default the gateway accepts all connections with no auth check.
-
-To require clients to authenticate, set one or more **auth tokens**:
+Channels are platform credentials stored in `~/.lingti.yaml`. The `channels` command is the preferred way to manage them — it reads, updates, and writes the config file for you.
 
 ```bash
-# Single token
+# Add a platform
+lingti-bot channels add --channel telegram --token YOUR_TOKEN
+lingti-bot channels add --channel slack --bot-token xoxb-... --app-token xapp-...
+lingti-bot channels add --channel discord --token MTxxx
+lingti-bot channels add --channel webapp --port 8080  # built-in web UI
+
+# List current status
+lingti-bot channels list
+
+# Remove a platform
+lingti-bot channels remove --channel discord
+```
+
+Once saved, credentials are loaded automatically every time you run `gateway` — no flags needed.
+
+## Managing Agents
+
+An **agent** is an isolated AI brain with its own workspace, session memory, model, instructions, and tool permissions. You can have multiple agents and route different platforms or channels to different agents.
+
+### Adding agents
+
+```bash
+# Default agent — used when no binding matches
+lingti-bot agents add main --default
+
+# A focused work agent with a different model
+lingti-bot agents add work \
+  --model claude-opus-4-6 \
+  --instructions "You are a focused work assistant. Be concise and precise."
+
+# An agent that can only read (no write/edit/shell)
+lingti-bot agents add readonly \
+  --deny-tools "write,edit,shell"
+```
+
+Each agent gets its own workspace directory (`~/.lingti/agents/<id>` by default). Workspace, model, provider, API key, and instructions are all optional — unset fields inherit from the global `ai:` config.
+
+### Routing bindings
+
+Bindings control which agent handles messages from which source. Resolution order (most specific wins):
+
+| Priority | Match | Example |
+|----------|-------|---------|
+| 1 (highest) | `platform` + `channel_id` | Only messages from `slack:C_WORK` |
+| 2 | `platform` only | All messages from `telegram` |
+| 3 (lowest) | Default agent | Anything unmatched |
+
+```bash
+# Route all Telegram messages to 'main'
+lingti-bot agents bind --bind telegram
+
+# Route a specific Slack channel to 'work'
+lingti-bot agents bind --agent work --bind slack:C_WORK_CHANNEL
+
+# See agents and their bindings
+lingti-bot agents list --bindings
+
+# Remove a binding
+lingti-bot agents unbind --agent work --bind slack:C_WORK_CHANNEL
+
+# Remove all bindings for an agent
+lingti-bot agents unbind --agent work --all
+```
+
+### Agent config in ~/.lingti.yaml
+
+```yaml
+agents:
+  - id: main
+    default: true
+    workspace: ~/.lingti/agents/main
+
+  - id: work
+    workspace: ~/my-work-workspace
+    model: claude-opus-4-6
+    instructions: "You are a focused work assistant."
+    deny_tools: [write, edit, shell]
+
+  - id: readonly
+    allow_tools: [read, glob, grep]
+
+bindings:
+  - agent_id: main
+    match:
+      platform: telegram
+  - agent_id: work
+    match:
+      platform: slack
+      channel_id: C_WORK_CHANNEL
+```
+
+`allow_tools` non-empty = whitelist (only those tools available). `deny_tools` = blacklist (those tools removed from the full set).
+
+## Gateway Flags
+
+| Flag | Env Var | Default | Description |
+|------|---------|---------|-------------|
+| `--addr` | `GATEWAY_ADDR` | `:18789` | WebSocket listen address |
+| `--auth-token` | `GATEWAY_AUTH_TOKEN` | | Single auth token for WebSocket clients |
+| `--auth-tokens` | `GATEWAY_AUTH_TOKENS` | | Comma-separated auth tokens |
+| `--no-ws` | | `false` | Disable WebSocket server |
+| `--provider` | `AI_PROVIDER` | `claude` | AI provider |
+| `--api-key` | `AI_API_KEY` | | AI API key (required) |
+| `--base-url` | `AI_BASE_URL` | | Custom AI API base URL |
+| `--model` | `AI_MODEL` | | Model name |
+| `--instructions` | | | Path to custom instructions file |
+| `--call-timeout` | `AI_CALL_TIMEOUT` | `90` | AI API call timeout (seconds) |
+| `--webapp-port` | `WEBAPP_PORT` | `0` | Web chat UI port (0 = disabled) |
+| `--debug-dir` | `BROWSER_DEBUG_DIR` | | Browser debug screenshot directory |
+
+All platform credential flags are also accepted (e.g. `--telegram-token`, `--slack-bot-token`) as one-time overrides. See the [CLI Reference](cli-reference.md#platform-flags) for the full table.
+
+## Disabling the WebSocket Server
+
+The WebSocket server starts by default. Disable it if you only want platform bots:
+
+```bash
+lingti-bot gateway --no-ws --api-key sk-ant-xxx
+```
+
+## Reloading Config
+
+After changing `~/.lingti.yaml` (e.g. adding a channel or agent), reload the running gateway without restarting it:
+
+```bash
+lingti-bot gateway restart
+```
+
+This sends `SIGHUP` to the running process via `~/.lingti/gateway.pid`.
+
+## Docker / CI (Flags Only)
+
+For deployments without a config file, all credentials can be supplied via flags or environment variables:
+
+```bash
+# Flags
+lingti-bot gateway \
+  --api-key sk-ant-xxx \
+  --telegram-token 123456:ABC-xxx
+
+# Environment variables
+export AI_API_KEY=sk-ant-xxx
+export TELEGRAM_BOT_TOKEN=123456:ABC-xxx
+lingti-bot gateway
+
+# docker-compose.yml
+services:
+  lingti-bot:
+    image: lingti-bot
+    environment:
+      AI_API_KEY: ${AI_API_KEY}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+    command: gateway
+```
+
+---
+
+## WebSocket API
+
+The gateway also exposes a WebSocket API on `:18789` for custom clients (web UIs, scripts, mobile apps). This is independent of platform bots — both run concurrently.
+
+### Authentication
+
+By default all WebSocket connections are accepted. To require a token:
+
+```bash
 lingti-bot gateway --auth-token my-secret --api-key sk-ant-xxx
 
-# Multiple tokens (each person gets their own token)
+# Multiple tokens (each person gets their own)
 lingti-bot gateway --auth-tokens "alice-token,bob-token" --api-key sk-ant-xxx
-
-# Via environment variable
-GATEWAY_AUTH_TOKENS="alice-token,bob-token" lingti-bot gateway --api-key sk-ant-xxx
 ```
 
-When auth is enabled, a client **must** send an `auth` message before it can chat. Any token in the list grants full access — there is no per-token permission hierarchy.
+When auth is enabled, clients must send an `auth` message before chatting.
 
-## HTTP endpoints
+### HTTP endpoints
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/health` | Returns `{"status":"ok"}` — useful for health checks |
-| `GET` | `/status` | Returns running status, client count, address, and whether auth is enabled |
+| `GET` | `/health` | Returns `{"status":"ok"}` |
+| `GET` | `/status` | Running status, client count, auth state |
 | `GET` | `/ws` | WebSocket upgrade endpoint |
 
 ```bash
-# Health check
 curl http://localhost:18789/health
-
-# Status
 curl http://localhost:18789/status
-# {"addr":":18789","auth_enabled":true,"clients":2,"status":"running"}
 ```
 
-## WebSocket protocol
+### Message protocol
 
-All messages are JSON objects with this envelope:
+All WebSocket messages are JSON with this envelope:
 
 ```json
 {
@@ -77,260 +233,89 @@ All messages are JSON objects with this envelope:
 }
 ```
 
-- `id` — arbitrary string; the server echoes it back on response messages so you can match requests to responses
-- `type` — one of the types listed below
-- `payload` — type-specific object (omitted for ping/pong)
-- `timestamp` — milliseconds since epoch (set by sender; server always sets it on outbound messages)
+#### Client → Server
 
-### Client → Server message types
+| Type | Description |
+|------|-------------|
+| `ping` | Keep-alive; server replies with `pong` |
+| `auth` | Authenticate: `{"payload": {"token": "..."}}` |
+| `chat` | Send message: `{"payload": {"text": "...", "session_id": "optional"}}` |
+| `command` | Built-in command: `{"payload": {"command": "status"}}` or `"clear"` |
 
-#### `ping`
+#### Server → Client
 
-Keep-alive from the client. Server replies with `pong`.
+| Type | Description |
+|------|-------------|
+| `pong` | Reply to `ping` |
+| `auth_result` | Auth outcome: `{"payload": {"success": true}}` |
+| `response` | AI reply: `{"payload": {"text": "...", "session_id": "...", "done": true}}` |
+| `event` | Command result |
+| `error` | Error: `{"payload": {"code": "unauthorized", "message": "..."}}` |
 
-```json
-{"type": "ping"}
-```
+**Error codes:** `unauthorized`, `invalid_message`, `invalid_payload`, `handler_error`, `no_handler`, `unknown_type`, `unknown_command`
 
-The server also sends WebSocket-level `Ping` frames every 30 seconds; respond with `Pong` to keep the connection alive.
+### Example clients
 
-#### `auth`
-
-Authenticate with a token. Required before `chat`/`command` when auth is enabled.
-
-```json
-{
-  "type": "auth",
-  "payload": {
-    "token": "my-secret-token"
-  }
-}
-```
-
-Server replies with `auth_result`.
-
-#### `chat`
-
-Send a message to the AI agent.
-
-```json
-{
-  "id": "req-1",
-  "type": "chat",
-  "payload": {
-    "text": "What is the capital of France?",
-    "session_id": "optional-session-id"
-  }
-}
-```
-
-- `text` — the message to send (required)
-- `session_id` — reuse an existing conversation session; omit to continue the current session for this connection, or to start fresh
-
-Server replies with one or more `response` messages.
-
-#### `command`
-
-Send a built-in gateway command.
-
-```json
-{
-  "type": "command",
-  "payload": {
-    "command": "status"
-  }
-}
-```
-
-**Available commands:**
-
-| Command | Description |
-|---------|-------------|
-| `status` | Returns this connection's `client_id`, `session_id`, and `authorized` state |
-| `clear` | Clears the session ID so the next message starts a new conversation |
-
-### Server → Client message types
-
-#### `pong`
-
-Reply to a client `ping`.
-
-```json
-{"type": "pong", "timestamp": 1700000000000}
-```
-
-#### `auth_result`
-
-Result of an `auth` attempt.
-
-```json
-{
-  "type": "auth_result",
-  "payload": {
-    "success": true,
-    "message": ""
-  }
-}
-```
-
-On failure, `success` is `false` and `message` explains why (e.g. `"Invalid token"`).
-
-#### `response`
-
-An AI response chunk. The server sends one response per `chat` message (currently non-streaming — the full text arrives at once with `done: true`).
-
-```json
-{
-  "id": "req-1",
-  "type": "response",
-  "payload": {
-    "text": "The capital of France is Paris.",
-    "session_id": "abc123",
-    "done": true
-  }
-}
-```
-
-- `id` echoes the request `id` from the `chat` message
-- `done: true` means this is the final response for that request
-
-#### `event`
-
-A server-pushed event, in response to a `command`.
-
-```json
-{
-  "type": "event",
-  "payload": {
-    "event": "status",
-    "data": {
-      "client_id": "1700000000000",
-      "session_id": "abc123",
-      "authorized": true
-    }
-  }
-}
-```
-
-#### `error`
-
-An error occurred processing the last message.
-
-```json
-{
-  "type": "error",
-  "payload": {
-    "code": "unauthorized",
-    "message": "Authentication required"
-  }
-}
-```
-
-**Error codes:**
-
-| Code | Meaning |
-|------|---------|
-| `unauthorized` | Auth is enabled and the client has not authenticated |
-| `invalid_message` | Message could not be parsed as JSON |
-| `invalid_payload` | Payload fields are missing or malformed |
-| `handler_error` | The AI agent returned an error |
-| `no_handler` | Gateway has no message handler (internal error) |
-| `unknown_type` | Unknown message `type` field |
-| `unknown_command` | Unknown `command` value in a `command` message |
-
-## Sessions
-
-Each connection starts with no session. The first `chat` message creates a session:
-
-1. If `session_id` is provided in the payload, that ID is used.
-2. Otherwise the connection's own client ID becomes the session ID.
-
-Subsequent `chat` messages on the same connection reuse that session, so the AI remembers earlier context. To start fresh, send a `clear` command or provide a new `session_id`.
-
-## Example: JavaScript client
+**JavaScript:**
 
 ```js
 const ws = new WebSocket("ws://localhost:18789/ws");
 
 ws.onopen = () => {
-  // Authenticate (skip this step if no auth tokens are configured)
-  ws.send(JSON.stringify({
-    type: "auth",
-    payload: { token: "my-secret-token" }
-  }));
+  // Skip if no auth configured
+  ws.send(JSON.stringify({ type: "auth", payload: { token: "my-secret" } }));
 };
 
-ws.onmessage = (event) => {
-  const msg = JSON.parse(event.data);
-
-  if (msg.type === "auth_result") {
-    if (!msg.payload.success) {
-      console.error("Auth failed:", msg.payload.message);
-      return;
-    }
-    // Authenticated — send a chat message
+ws.onmessage = ({ data }) => {
+  const msg = JSON.parse(data);
+  if (msg.type === "auth_result" && msg.payload.success) {
     ws.send(JSON.stringify({
       id: "req-1",
       type: "chat",
       payload: { text: "Hello, what can you do?" }
     }));
   }
-
   if (msg.type === "response" && msg.payload.done) {
     console.log("AI:", msg.payload.text);
-  }
-
-  if (msg.type === "error") {
-    console.error(`Error [${msg.payload.code}]:`, msg.payload.message);
   }
 };
 ```
 
-## Example: Python client
+**Python:**
 
 ```python
-import json
-import websocket  # pip install websocket-client
+import json, websocket
 
 ws = websocket.create_connection("ws://localhost:18789/ws")
+ws.send(json.dumps({"type": "auth", "payload": {"token": "my-secret"}}))
+json.loads(ws.recv())  # auth_result
 
-# Authenticate
-ws.send(json.dumps({"type": "auth", "payload": {"token": "my-secret-token"}}))
-result = json.loads(ws.recv())
-assert result["payload"]["success"], f"Auth failed: {result['payload']['message']}"
-
-# Send a message
-ws.send(json.dumps({
-    "id": "req-1",
-    "type": "chat",
-    "payload": {"text": "Summarize today's news"}
-}))
-
-# Read response
-response = json.loads(ws.recv())
-print("AI:", response["payload"]["text"])
-
+ws.send(json.dumps({"id": "1", "type": "chat", "payload": {"text": "Hello"}}))
+print(json.loads(ws.recv())["payload"]["text"])
 ws.close()
 ```
 
-## Connection lifecycle
+### Sessions
+
+Each WebSocket connection has one active session. The session ID is established on the first `chat` message:
+- Provide `session_id` in the payload to use a specific session
+- Omit it to use the connection's client ID as the session
+
+Send `{"type": "command", "payload": {"command": "clear"}}` to reset the session and start a fresh conversation.
+
+### Connection lifecycle
 
 ```
 Client                          Gateway
-  |                                |
-  |--- WebSocket upgrade --------->|
-  |<-- connection accepted --------|
-  |                                |
-  |--- auth (if required) -------->|
-  |<-- auth_result ----------------|
-  |                                |
-  |--- chat {"text": "Hi"} ------->|
-  |<-- response {"done": true} ----|
-  |                                |
-  |--- command {"command":"clear"} |
-  |<-- event {"event":"cleared"} --|
-  |                                |
-  |--- [disconnect] -------------->|
+  |--- WebSocket upgrade -------->|
+  |<-- connection accepted -------|
+  |--- auth (if required) ------->|
+  |<-- auth_result ---------------|
+  |--- chat {"text": "Hi"} ------>|
+  |<-- response {"done": true} ---|
+  |--- command "clear" ---------->|
+  |<-- event "cleared" ----------|
+  |--- [disconnect] ------------->|
 ```
 
-The server sends WebSocket-level Ping frames every 30 seconds. If your client does not respond with Pong within 60 seconds, the connection is closed.
+The server sends WebSocket-level Ping frames every 30 seconds. Connections that don't respond with Pong within 60 seconds are closed.

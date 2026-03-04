@@ -53,7 +53,7 @@ lingti-bot onboard
 
 # Command line / 命令行指定
 lingti-bot relay --provider deepseek --api-key sk-xxx
-lingti-bot router --provider openai --api-key sk-xxx --model gpt-4o
+lingti-bot gateway --provider openai --api-key sk-xxx --model gpt-4o
 
 # Custom base URL / 自定义 API 地址
 lingti-bot relay --provider siliconflow --api-key sk-xxx --base-url https://api.siliconflow.cn/v1

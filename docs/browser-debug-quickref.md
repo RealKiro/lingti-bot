@@ -4,12 +4,12 @@
 
 ```bash
 # Method 1: Command-line flags
-lingti-bot router --debug --debug-dir /tmp/lingti-debug --provider deepseek --api-key sk-xxx
+lingti-bot gateway --debug --debug-dir /tmp/lingti-debug --provider deepseek --api-key sk-xxx
 
 # Method 2: Environment variables
 export BROWSER_DEBUG=1
 export BROWSER_DEBUG_DIR=/tmp/lingti-debug
-lingti-bot router --provider deepseek --api-key sk-xxx
+lingti-bot gateway --provider deepseek --api-key sk-xxx
 ```
 
 ## What Gets Captured

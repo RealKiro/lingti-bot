@@ -10,14 +10,14 @@ Enable debug mode when starting the router:
 
 ```bash
 # Using command-line flags
-lingti-bot router --provider deepseek --api-key sk-xxx \
+lingti-bot gateway --provider deepseek --api-key sk-xxx \
   --debug \
   --debug-dir /tmp/lingti-debug
 
 # Using environment variables
 export BROWSER_DEBUG=1
 export BROWSER_DEBUG_DIR=/tmp/lingti-debug
-lingti-bot router --provider deepseek --api-key sk-xxx
+lingti-bot gateway --provider deepseek --api-key sk-xxx
 ```
 
 ## Debug Features
@@ -163,7 +163,7 @@ find /tmp/lingti-bot -name "*.png" -mtime +7 -delete
 
 ```bash
 # Start with debug enabled
-lingti-bot router --debug --debug-dir /tmp/login-debug \
+lingti-bot gateway --debug --debug-dir /tmp/login-debug \
   --provider deepseek --api-key sk-xxx
 ```
 
@@ -205,7 +205,7 @@ Debug mode has minimal performance impact:
 Simply restart without the `--debug` flag:
 
 ```bash
-lingti-bot router --provider deepseek --api-key sk-xxx
+lingti-bot gateway --provider deepseek --api-key sk-xxx
 ```
 
 Or unset the environment variable:

@@ -99,7 +99,7 @@ Even with auto-approval enabled, the AI will still refuse:
 
 **Without `--yes`:**
 ```bash
-$ lingti-bot router --provider qwen --api-key sk-xxx
+$ lingti-bot gateway --provider qwen --api-key sk-xxx
 
 User: Update the README with the new feature description
 
@@ -215,7 +215,7 @@ If you need persistent auto-approval, consider:
 1. Flag placed incorrectly (must be before subcommand):
    ```bash
    # ❌ Wrong
-   lingti-bot router --yes --provider deepseek --api-key sk-xxx
+   lingti-bot gateway --yes --provider deepseek --api-key sk-xxx
 
    # ✅ Correct
    lingti-bot --yes router --provider deepseek --api-key sk-xxx
@@ -269,7 +269,7 @@ In verbose mode, you should see the system prompt includes:
    lingti-bot --yes router --provider deepseek --api-key sk-xxx
 
    # Regular mode for exploratory tasks
-   lingti-bot router --provider deepseek --api-key sk-xxx
+   lingti-bot gateway --provider deepseek --api-key sk-xxx
    ```
 
 ## Security Notes
