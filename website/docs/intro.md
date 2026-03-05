@@ -77,7 +77,7 @@ lingti-bot gateway --provider deepseek --api-key sk-xxx --webapp-port 8080
 ```
 
 <p align="center">
-<img src="docs/images/webapp-demo.png" alt="Web 聊天界面演示" width="800" />
+<img src="/lingti-bot/images/webapp-demo.png" alt="Web 聊天界面演示" width="800" />
 </p>
 
 **核心特性：**
@@ -123,9 +123,9 @@ lingti-bot gateway --provider deepseek --api-key sk-xxx
 ### 智能对话、文件管理、信息检索
 <table>
 <tr>
-<td width="33%"><img src="docs/images/demo-chat-1.png" alt="智能助手" /></td>
-<td width="33%"><img src="docs/images/demo-chat-2.png" alt="企业微信文件传输" /></td>
-<td width="33%"><img src="docs/images/demo-chat-3.png" alt="信息搜索" /></td>
+<td width="33%"><img src="/lingti-bot/images/demo-chat-1.png" alt="智能助手" /></td>
+<td width="33%"><img src="/lingti-bot/images/demo-chat-2.png" alt="企业微信文件传输" /></td>
+<td width="33%"><img src="/lingti-bot/images/demo-chat-3.png" alt="信息搜索" /></td>
 </tr>
 <tr>
 <td align="center"><sub>💬 智能对话</sub></td>
@@ -136,7 +136,7 @@ lingti-bot gateway --provider deepseek --api-key sk-xxx
 
 <summary>📺 <b>后台运行演示</b> — <code>make && dist/lingti-bot gateway</code></summary>
 <br>
-<img src="docs/images/demo-terminal.png" alt="Terminal Demo" />
+<img src="/lingti-bot/images/demo-terminal.png" alt="Terminal Demo" />
 <p><sub>克隆代码后直接编译运行，配合 DeepSeek 模型，实时处理钉钉消息</sub></p>
 
 ### 定时任务 — AI 自动创建 Cron Job
@@ -144,7 +144,7 @@ lingti-bot gateway --provider deepseek --api-key sk-xxx
 > 用自然语言创建定时任务 — 告诉 AI 你想要什么，剩下的交给它
 
 <p align="center">
-<img src="docs/images/demo-cron-wecom.png" alt="AI 创建定时任务演示" width="720" />
+<img src="/lingti-bot/images/demo-cron-wecom.png" alt="AI 创建定时任务演示" width="720" />
 </p>
 
 在企业微信中对 AI 说一句话，即可创建复杂的定时任务。支持 Cron 表达式调度、macOS 系统通知、Shell 脚本执行等，真正实现无人值守自动化。
@@ -154,7 +154,7 @@ lingti-bot gateway --provider deepseek --api-key sk-xxx
 > 用自然语言管理和传输文件 — 就像跟同事说话一样简单
 
 <p align="center">
-<img src="docs/images/wecom-file-transfer.png" alt="企业微信 AI 文件传输" width="720" />
+<img src="/lingti-bot/images/wecom-file-transfer.png" alt="企业微信 AI 文件传输" width="720" />
 </p>
 
 直接在企业微信中用自然语言浏览、查找、传输电脑上的文件。无需远程桌面，无需 U 盘，对 AI 说一句话即可。

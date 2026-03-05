@@ -38,8 +38,13 @@ jobs:
                    skills cron-jobs file-sending auto-approval roadmap; do
             [ -f "docs/${f}.md" ] && cp "docs/${f}.md" "website/docs/${f}.md"
           done
-          # Copy images
+          # Copy images to both locations:
+          # - docs/images/ for markdown-syntax images (![alt](images/...))
+          # - static/images/ for HTML <img src="/lingti-bot/images/..."> tags
           cp -r docs/images website/docs/images
+          cp -r docs/images website/static/images
+          # Fix image paths in intro.md (copied from repo root, uses docs/images/ prefix)
+          sed -i 's|src="docs/images/|src="/lingti-bot/images/|g' website/docs/intro.md
 
       - name: Install dependencies
         run: npm ci
