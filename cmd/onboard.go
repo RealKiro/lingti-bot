@@ -203,6 +203,20 @@ func promptText(prompt string, defaultVal string) string {
 	return val
 }
 
+func promptYesNo(question string, defaultYes bool) bool {
+	hint := "y/N"
+	if defaultYes {
+		hint = "Y/n"
+	}
+	fmt.Printf("  %s [%s]: ", question, hint)
+	scanner.Scan()
+	val := strings.TrimSpace(strings.ToLower(scanner.Text()))
+	if val == "" {
+		return defaultYes
+	}
+	return val == "y" || val == "yes"
+}
+
 func promptSelect(prompt string, options []string, defaultIdx int) int {
 	fmt.Printf("\n  %s\n", prompt)
 	for i, opt := range options {

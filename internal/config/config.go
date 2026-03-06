@@ -22,6 +22,7 @@ type Config struct {
 	Browser   BrowserConfig             `yaml:"browser,omitempty"`
 	Agents    []AgentEntry              `yaml:"agents,omitempty"`
 	Bindings  []AgentBinding            `yaml:"bindings,omitempty"`
+	BotID     string                    `yaml:"bot_id,omitempty"`
 }
 
 // ProviderEntry defines a named AI provider configuration.
@@ -421,7 +422,18 @@ func ConfigDir() string {
 	return filepath.Join(home, ".lingti")
 }
 
+// overridePath is set via SetConfigPath to use a custom config file location.
+var overridePath string
+
+// SetConfigPath overrides the default ~/.lingti.yaml path for all Load() calls.
+func SetConfigPath(path string) {
+	overridePath = path
+}
+
 func ConfigPath() string {
+	if overridePath != "" {
+		return overridePath
+	}
 	home, _ := os.UserHomeDir()
 	return filepath.Join(home, ".lingti.yaml")
 }

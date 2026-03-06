@@ -67,8 +67,11 @@ irm https://cli.lingti.com/install.ps1 -OutFile install.ps1; .\install.ps1 -Bot
 lingti-bot verify --platform wecom --wecom-corp-id ... --wecom-token ...
 # 去企业微信后台配置 URL: https://bot.lingti.com/wecom
 
-# 3. 开始处理消息
-lingti-bot relay --platform wecom --provider deepseek --api-key sk-xxx ...
+# 3. 配置 Agent（首次）
+lingti-bot agents add
+
+# 4. 开始处理消息（之后直接运行，无需 --provider/--api-key）
+lingti-bot relay --platform wecom
 ```
 
 **无需：**
@@ -81,7 +84,8 @@ lingti-bot relay --platform wecom --provider deepseek --api-key sk-xxx ...
 #### 方式二：自建服务器模式
 
 ```bash
-lingti-bot gateway --wecom-corp-id ... --provider deepseek --api-key ...
+# 凭证已通过 channels add 保存到 ~/.lingti.yaml，无需再传参数
+lingti-bot gateway
 ```
 
 与传统方式类似，但：
@@ -123,12 +127,18 @@ lingti-bot gateway --wecom-corp-id ... --provider deepseek --api-key ...
 | Slack | ✅ | ✅ | |
 | Discord | ✅ | ✅ | |
 | Telegram | ✅ | ✅ | |
-| WhatsApp | ✅ | ❌ | lingti-bot 计划支持 |
-| iMessage | ✅ | ❌ | |
+| WhatsApp | ✅ | ✅ | |
+| iMessage | ✅ | ✅ | BlueBubbles |
+| Signal | ✅ | ✅ | |
+| LINE | ✅ | ✅ | |
+| Microsoft Teams | ✅ | ✅ | |
+| Matrix/Element | ✅ | ✅ | |
+| Google Chat | ✅ | ✅ | |
+| Mattermost | ✅ | ✅ | |
 | 飞书/Lark | ❌ | ✅ | **lingti-bot 独有** |
 | 企业微信 | ❌ | ✅ | **lingti-bot 独有** |
 | 微信公众号 | ❌ | ✅ | **lingti-bot 独有**（云中继）|
-| 钉钉 | ❌ | 🚧 | 开发中 |
+| 钉钉 | ❌ | ✅ | **lingti-bot 独有** |
 
 ## 云中继技术详解
 

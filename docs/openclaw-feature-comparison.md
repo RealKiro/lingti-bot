@@ -19,29 +19,34 @@
 |---------|----------|------------|
 | CLI Tool | ✅ | ✅ |
 | MCP Server | ✅ | ✅ |
-| Web UI | ✅ | ❌ |
+| Web UI | ✅ | ✅ Built-in webapp |
 | macOS App | ✅ | ❌ |
 | iOS App | ✅ | ❌ |
 | Android App | ✅ | ❌ |
-| Browser Automation | ✅ | ❌ |
-| Skills System | ✅ | ❌ |
+| Browser Automation | ✅ | ✅ CDP engine (14 tools) |
+| Skills System | ✅ | ✅ 8 built-in skills |
 | Plugin System | ✅ | ❌ |
 | Hooks System | ✅ | ❌ |
-| Memory/RAG | ✅ | ❌ |
+| Memory/RAG | ✅ | ❌ (session memory only) |
 | Terminal UI (TUI) | ✅ | ❌ |
 | Cloud Relay | ❌ | ✅ |
 | Single Binary | ❌ | ✅ |
+| Agent Management | ✅ | ✅ `agents add/list/bind` |
+| Channel Management | ✅ | ✅ `channels add/list` |
+| Multi-agent routing | ✅ | ✅ bindings by platform/channel |
+| Cron/Scheduling | ✅ | ✅ AI-powered cron jobs |
+| Social Platform Automation | ❌ | ✅ 知乎, 小红书, etc. |
+| China Platforms | ❌ | ✅ 飞书, 企微, 钉钉, 微信 |
 
 ## Messaging Platforms
 
-### lingti-bot Supported (7)
-- Discord
-- Telegram
-- Slack
-- Feishu/Lark
-- DingTalk
-- WeChat (WeCom)
-- Relay (generic webhook)
+### lingti-bot Supported (19+)
+- Discord, Telegram, Slack
+- Feishu/Lark, DingTalk, WeCom (企业微信), WeChat (微信公众号)
+- WhatsApp, LINE, Microsoft Teams, Matrix/Element
+- Google Chat, Mattermost, iMessage, Signal
+- Twitch, NOSTR, Zalo, Nextcloud Talk
+- Built-in Web Chat UI (`--webapp-port`)
 
 ### OpenClaw Additional Platforms (24+)
 - iMessage / BlueBubbles
@@ -70,7 +75,11 @@ apps/
 ```
 
 ### lingti-bot
-None - CLI only
+Built-in web chat UI, enabled with `--webapp-port 8080`:
+- Multi-session parallel chat
+- Session persistence (localStorage)
+- Markdown rendering
+- No Node.js / no extra install — embedded in binary - CLI only
 
 ## Web UI
 
@@ -86,8 +95,12 @@ None - CLI only
   - Theme management
   - Debug tools
 
-### lingti-bot
-None
+### lingti-bot (`internal/browser/` + 14 MCP tools)
+- Chrome DevTools Protocol (CDP)
+- Snapshot-then-Act model (accessibility tree)
+- Connects to existing Chrome (`--remote-debugging-port`)
+- 14 tools: navigate, snapshot, click, type, press, JS execution, batch click, tabs, screenshot
+- No Node.js / Playwright required
 
 ## Skills System
 
@@ -102,8 +115,19 @@ None
 | System | 1Password, tmux, Weather |
 | Location | Local Places, GoPlaces |
 
-### lingti-bot
-No skills system - tools are built into the MCP server.
+### lingti-bot (`skills/` - 8 built-in)
+| Skill | Description |
+|-------|-------------|
+| GitHub | PR/Issue management |
+| Slack | Slack messaging |
+| Discord | Discord messaging |
+| Peekaboo | macOS UI automation |
+| Tmux | Terminal session control |
+| Weather | Weather queries |
+| 1Password | Password management |
+| Obsidian | Note-taking |
+
+Skills are YAML-frontmatter Markdown files (`SKILL.md`). Custom and project-level skills supported.
 
 ## Browser Automation
 
@@ -194,7 +218,12 @@ None - stdout only
 - Nix integration
 
 ### lingti-bot (`internal/config/config.go`)
-Single configuration file with basic settings
+- Named provider definitions (`providers:`)
+- Agent definitions with per-agent model/instructions/workspace (`agents:`)
+- Routing bindings by platform+channel (`bindings:`)
+- Platform credentials (`platforms:`)
+- Security sandboxing (`security:`)
+- Browser config, logging, MCP servers
 
 ## CLI Commands
 
@@ -206,11 +235,14 @@ Single configuration file with basic settings
 - Plugin management
 - Many more specialized commands
 
-### lingti-bot (`cmd/` - 15 files)
-- serve, relay, router, gateway
-- verify, setup, quickstart
-- talk, voice
-- feishu, whoami, version
+### lingti-bot (`cmd/` - 20+ files)
+- `serve`, `relay`, `gateway`
+- `agents add/list/info/bind/unbind` — Agent management
+- `channels add/list` — Channel credential management
+- `skills`, `skills check`, `skills info` — Skills discovery
+- `doctor` — Health diagnostics
+- `onboard` — Interactive first-run setup
+- `version`, `whoami`
 
 ## Infrastructure
 
@@ -276,12 +308,16 @@ Additional tools in both (via agent):
 - Extensive infrastructure
 
 **lingti-bot** is a focused CLI messaging bot with:
-- Single Go binary
-- Cloud relay for easy setup
-- China platform focus (Feishu, WeChat, DingTalk)
-- Core MCP tools
-- Minimal dependencies
-- Fast deployment
+- Single Go binary, zero runtime dependencies
+- Cloud relay for easy setup (no public server needed)
+- 19+ platform support including all China platforms
+- Agent + Channel management (`agents add`, `channels add`)
+- Multi-agent routing via bindings
+- Built-in browser automation (CDP, 14 tools)
+- Built-in web chat UI
+- 75+ MCP tools + 8 skills
+- AI-powered cron jobs
+- Social platform automation (知乎, 小红书)
 
 ## Related Documents
 

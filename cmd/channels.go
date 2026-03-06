@@ -58,12 +58,29 @@ var (
 	caAuthToken       string // webapp
 )
 
+// anyFlagChanged returns true if any of the named flags were explicitly set.
+func anyFlagChanged(cmd *cobra.Command, names ...string) bool {
+	for _, n := range names {
+		if cmd.Flags().Changed(n) {
+			return true
+		}
+	}
+	return false
+}
+
 var channelsAddCmd = &cobra.Command{
 	Use:   "add",
 	Short: "Add or update channel credentials in ~/.lingti.yaml",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if channelName == "" {
-			return fmt.Errorf("--channel is required")
+			// interactive: pick platform
+			initScanner()
+			options := make([]string, len(platformOptions))
+			for i, p := range platformOptions {
+				options[i] = p.label
+			}
+			idx := promptSelect("Select platform to configure:", options, 0)
+			channelName = platformOptions[idx].name
 		}
 
 		cfg, err := config.Load()
@@ -71,170 +88,258 @@ var channelsAddCmd = &cobra.Command{
 			return fmt.Errorf("failed to load config: %w", err)
 		}
 
+		// ensure scanner is ready for any interactive step* calls
+		if scanner == nil {
+			initScanner()
+		}
+
 		switch strings.ToLower(channelName) {
 		case "telegram":
-			if caToken != "" {
+			if anyFlagChanged(cmd, "token") {
 				cfg.Platforms.Telegram.Token = caToken
+			} else {
+				stepTelegram(cfg)
 			}
 		case "slack":
-			if caBotToken != "" {
-				cfg.Platforms.Slack.BotToken = caBotToken
-			}
-			if caAppToken != "" {
-				cfg.Platforms.Slack.AppToken = caAppToken
+			if anyFlagChanged(cmd, "bot-token", "app-token") {
+				if caBotToken != "" {
+					cfg.Platforms.Slack.BotToken = caBotToken
+				}
+				if caAppToken != "" {
+					cfg.Platforms.Slack.AppToken = caAppToken
+				}
+			} else {
+				stepSlack(cfg)
 			}
 		case "discord":
-			if caToken != "" {
+			if anyFlagChanged(cmd, "token") {
 				cfg.Platforms.Discord.Token = caToken
+			} else {
+				stepDiscord(cfg)
 			}
 		case "feishu":
-			if caAppID != "" {
-				cfg.Platforms.Feishu.AppID = caAppID
-			}
-			if caAppSecret != "" {
-				cfg.Platforms.Feishu.AppSecret = caAppSecret
+			if anyFlagChanged(cmd, "app-id", "app-secret") {
+				if caAppID != "" {
+					cfg.Platforms.Feishu.AppID = caAppID
+				}
+				if caAppSecret != "" {
+					cfg.Platforms.Feishu.AppSecret = caAppSecret
+				}
+			} else {
+				stepFeishu(cfg)
 			}
 		case "dingtalk":
-			if caClientID != "" {
-				cfg.Platforms.DingTalk.ClientID = caClientID
-			}
-			if caClientSecret != "" {
-				cfg.Platforms.DingTalk.ClientSecret = caClientSecret
+			if anyFlagChanged(cmd, "client-id", "client-secret") {
+				if caClientID != "" {
+					cfg.Platforms.DingTalk.ClientID = caClientID
+				}
+				if caClientSecret != "" {
+					cfg.Platforms.DingTalk.ClientSecret = caClientSecret
+				}
+			} else {
+				stepDingTalk(cfg)
 			}
 		case "wecom":
-			if caCorpID != "" {
-				cfg.Platforms.WeCom.CorpID = caCorpID
-			}
-			if caAgentID != "" {
-				cfg.Platforms.WeCom.AgentID = caAgentID
-			}
-			if caSecret != "" {
-				cfg.Platforms.WeCom.Secret = caSecret
-			}
-			if caToken != "" {
-				cfg.Platforms.WeCom.Token = caToken
-			}
-			if caAESKey != "" {
-				cfg.Platforms.WeCom.AESKey = caAESKey
-			}
-			if caPort != 0 {
-				cfg.Platforms.WeCom.CallbackPort = caPort
+			if anyFlagChanged(cmd, "corp-id", "agent-id", "secret", "token", "aes-key", "port") {
+				if caCorpID != "" {
+					cfg.Platforms.WeCom.CorpID = caCorpID
+				}
+				if caAgentID != "" {
+					cfg.Platforms.WeCom.AgentID = caAgentID
+				}
+				if caSecret != "" {
+					cfg.Platforms.WeCom.Secret = caSecret
+				}
+				if caToken != "" {
+					cfg.Platforms.WeCom.Token = caToken
+				}
+				if caAESKey != "" {
+					cfg.Platforms.WeCom.AESKey = caAESKey
+				}
+				if caPort != 0 {
+					cfg.Platforms.WeCom.CallbackPort = caPort
+				}
+			} else {
+				stepWecom(cfg)
 			}
 		case "whatsapp":
-			if caPhoneID != "" {
-				cfg.Platforms.WhatsApp.PhoneNumberID = caPhoneID
-			}
-			if caAccessToken != "" {
-				cfg.Platforms.WhatsApp.AccessToken = caAccessToken
-			}
-			if caVerifyToken != "" {
-				cfg.Platforms.WhatsApp.VerifyToken = caVerifyToken
+			if anyFlagChanged(cmd, "phone-id", "access-token", "verify-token") {
+				if caPhoneID != "" {
+					cfg.Platforms.WhatsApp.PhoneNumberID = caPhoneID
+				}
+				if caAccessToken != "" {
+					cfg.Platforms.WhatsApp.AccessToken = caAccessToken
+				}
+				if caVerifyToken != "" {
+					cfg.Platforms.WhatsApp.VerifyToken = caVerifyToken
+				}
+			} else {
+				stepWhatsApp(cfg)
 			}
 		case "line":
-			if caChannelSecret != "" {
-				cfg.Platforms.LINE.ChannelSecret = caChannelSecret
-			}
-			if caChannelToken != "" {
-				cfg.Platforms.LINE.ChannelToken = caChannelToken
+			if anyFlagChanged(cmd, "channel-secret", "channel-token") {
+				if caChannelSecret != "" {
+					cfg.Platforms.LINE.ChannelSecret = caChannelSecret
+				}
+				if caChannelToken != "" {
+					cfg.Platforms.LINE.ChannelToken = caChannelToken
+				}
+			} else {
+				stepLINE(cfg)
 			}
 		case "teams":
-			if caAppID != "" {
-				cfg.Platforms.Teams.AppID = caAppID
-			}
-			if caAppPassword != "" {
-				cfg.Platforms.Teams.AppPassword = caAppPassword
-			}
-			if caTenantID != "" {
-				cfg.Platforms.Teams.TenantID = caTenantID
+			if anyFlagChanged(cmd, "app-id", "app-password", "tenant-id") {
+				if caAppID != "" {
+					cfg.Platforms.Teams.AppID = caAppID
+				}
+				if caAppPassword != "" {
+					cfg.Platforms.Teams.AppPassword = caAppPassword
+				}
+				if caTenantID != "" {
+					cfg.Platforms.Teams.TenantID = caTenantID
+				}
+			} else {
+				stepTeams(cfg)
 			}
 		case "matrix":
-			if caHomeserverURL != "" {
-				cfg.Platforms.Matrix.HomeserverURL = caHomeserverURL
-			}
-			if caUserID != "" {
-				cfg.Platforms.Matrix.UserID = caUserID
-			}
-			if caAccessToken != "" {
-				cfg.Platforms.Matrix.AccessToken = caAccessToken
+			if anyFlagChanged(cmd, "homeserver-url", "user-id", "access-token") {
+				if caHomeserverURL != "" {
+					cfg.Platforms.Matrix.HomeserverURL = caHomeserverURL
+				}
+				if caUserID != "" {
+					cfg.Platforms.Matrix.UserID = caUserID
+				}
+				if caAccessToken != "" {
+					cfg.Platforms.Matrix.AccessToken = caAccessToken
+				}
+			} else {
+				stepMatrix(cfg)
 			}
 		case "mattermost":
-			if caServerURL != "" {
-				cfg.Platforms.Mattermost.ServerURL = caServerURL
-			}
-			if caToken != "" {
-				cfg.Platforms.Mattermost.Token = caToken
-			}
-			if caTeamName != "" {
-				cfg.Platforms.Mattermost.TeamName = caTeamName
+			if anyFlagChanged(cmd, "server-url", "token", "team-name") {
+				if caServerURL != "" {
+					cfg.Platforms.Mattermost.ServerURL = caServerURL
+				}
+				if caToken != "" {
+					cfg.Platforms.Mattermost.Token = caToken
+				}
+				if caTeamName != "" {
+					cfg.Platforms.Mattermost.TeamName = caTeamName
+				}
+			} else {
+				stepMattermost(cfg)
 			}
 		case "signal":
-			if caAPIURL != "" {
-				cfg.Platforms.Signal.APIURL = caAPIURL
-			}
-			if caPhoneNumber != "" {
-				cfg.Platforms.Signal.PhoneNumber = caPhoneNumber
+			if anyFlagChanged(cmd, "api-url", "phone-number") {
+				if caAPIURL != "" {
+					cfg.Platforms.Signal.APIURL = caAPIURL
+				}
+				if caPhoneNumber != "" {
+					cfg.Platforms.Signal.PhoneNumber = caPhoneNumber
+				}
+			} else {
+				stepSignal(cfg)
 			}
 		case "imessage":
-			if caBlueBubblesURL != "" {
-				cfg.Platforms.IMessage.BlueBubblesURL = caBlueBubblesURL
-			}
-			if caBlueBubblesPass != "" {
-				cfg.Platforms.IMessage.BlueBubblesPassword = caBlueBubblesPass
+			if anyFlagChanged(cmd, "bluebubbles-url", "bluebubbles-password") {
+				if caBlueBubblesURL != "" {
+					cfg.Platforms.IMessage.BlueBubblesURL = caBlueBubblesURL
+				}
+				if caBlueBubblesPass != "" {
+					cfg.Platforms.IMessage.BlueBubblesPassword = caBlueBubblesPass
+				}
+			} else {
+				stepIMessage(cfg)
 			}
 		case "twitch":
-			if caToken != "" {
-				cfg.Platforms.Twitch.Token = caToken
-			}
-			if caChannelNameFlag != "" {
-				cfg.Platforms.Twitch.Channel = caChannelNameFlag
-			}
-			if caBotName != "" {
-				cfg.Platforms.Twitch.BotName = caBotName
+			if anyFlagChanged(cmd, "token", "channel-name", "bot-name") {
+				if caToken != "" {
+					cfg.Platforms.Twitch.Token = caToken
+				}
+				if caChannelNameFlag != "" {
+					cfg.Platforms.Twitch.Channel = caChannelNameFlag
+				}
+				if caBotName != "" {
+					cfg.Platforms.Twitch.BotName = caBotName
+				}
+			} else {
+				stepTwitch(cfg)
 			}
 		case "nostr":
-			if caPrivateKey != "" {
-				cfg.Platforms.NOSTR.PrivateKey = caPrivateKey
-			}
-			if caRelays != "" {
-				cfg.Platforms.NOSTR.Relays = caRelays
+			if anyFlagChanged(cmd, "private-key", "relays") {
+				if caPrivateKey != "" {
+					cfg.Platforms.NOSTR.PrivateKey = caPrivateKey
+				}
+				if caRelays != "" {
+					cfg.Platforms.NOSTR.Relays = caRelays
+				}
+			} else {
+				stepNOSTR(cfg)
 			}
 		case "zalo":
-			if caAppID != "" {
-				cfg.Platforms.Zalo.AppID = caAppID
-			}
-			if caSecretKey != "" {
-				cfg.Platforms.Zalo.SecretKey = caSecretKey
-			}
-			if caAccessToken != "" {
-				cfg.Platforms.Zalo.AccessToken = caAccessToken
+			if anyFlagChanged(cmd, "app-id", "secret-key", "access-token") {
+				if caAppID != "" {
+					cfg.Platforms.Zalo.AppID = caAppID
+				}
+				if caSecretKey != "" {
+					cfg.Platforms.Zalo.SecretKey = caSecretKey
+				}
+				if caAccessToken != "" {
+					cfg.Platforms.Zalo.AccessToken = caAccessToken
+				}
+			} else {
+				stepZalo(cfg)
 			}
 		case "nextcloud":
-			if caServerURL != "" {
-				cfg.Platforms.Nextcloud.ServerURL = caServerURL
-			}
-			if caUsername != "" {
-				cfg.Platforms.Nextcloud.Username = caUsername
-			}
-			if caPassword != "" {
-				cfg.Platforms.Nextcloud.Password = caPassword
-			}
-			if caRoomToken != "" {
-				cfg.Platforms.Nextcloud.RoomToken = caRoomToken
+			if anyFlagChanged(cmd, "server-url", "username", "password", "room-token") {
+				if caServerURL != "" {
+					cfg.Platforms.Nextcloud.ServerURL = caServerURL
+				}
+				if caUsername != "" {
+					cfg.Platforms.Nextcloud.Username = caUsername
+				}
+				if caPassword != "" {
+					cfg.Platforms.Nextcloud.Password = caPassword
+				}
+				if caRoomToken != "" {
+					cfg.Platforms.Nextcloud.RoomToken = caRoomToken
+				}
+			} else {
+				stepNextcloud(cfg)
 			}
 		case "googlechat":
-			if caProjectID != "" {
-				cfg.Platforms.GoogleChat.ProjectID = caProjectID
-			}
-			if caCredentialsFile != "" {
-				cfg.Platforms.GoogleChat.CredentialsFile = caCredentialsFile
+			if anyFlagChanged(cmd, "project-id", "credentials-file") {
+				if caProjectID != "" {
+					cfg.Platforms.GoogleChat.ProjectID = caProjectID
+				}
+				if caCredentialsFile != "" {
+					cfg.Platforms.GoogleChat.CredentialsFile = caCredentialsFile
+				}
+			} else {
+				stepGoogleChat(cfg)
 			}
 		case "webapp":
-			if caPort != 0 {
-				cfg.Platforms.Webapp.Port = caPort
+			if anyFlagChanged(cmd, "port", "auth-token") {
+				if caPort != 0 {
+					cfg.Platforms.Webapp.Port = caPort
+				}
+				if caAuthToken != "" {
+					cfg.Platforms.Webapp.Token = caAuthToken
+				}
+			} else {
+				if scanner == nil {
+					initScanner()
+				}
+				portStr := promptText("Port", "8080")
+				fmt.Sscan(portStr, &cfg.Platforms.Webapp.Port)
+				cfg.Platforms.Webapp.Token = promptText("Auth Token (optional)", cfg.Platforms.Webapp.Token)
+				fmt.Println("\n  > Webapp configured")
 			}
-			if caAuthToken != "" {
-				cfg.Platforms.Webapp.Token = caAuthToken
-			}
+		case "skip":
+			fmt.Println("  > Channel configuration skipped")
+			return nil
+		case "wechat":
+			stepWeChat(cfg)
 		default:
 			return fmt.Errorf("unknown channel: %q", channelName)
 		}

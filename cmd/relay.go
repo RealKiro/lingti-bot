@@ -12,6 +12,7 @@ import (
 	"syscall"
 
 	"github.com/pltanton/lingti-bot/internal/agent"
+	"github.com/google/uuid"
 	"github.com/pltanton/lingti-bot/internal/agent/mcpclient"
 	"github.com/pltanton/lingti-bot/internal/config"
 	cronpkg "github.com/pltanton/lingti-bot/internal/cron"
@@ -21,17 +22,19 @@ import (
 )
 
 var (
-	relayUserID     string
-	relayPlatform   string
-	relayServerURL  string
-	relayWebhookURL string
+	relayUserID        string
+	relayPlatform      string
+	relayHost          string
+	relayServerURL     string
+	relayWebhookURL    string
+	relayRefreshBotID  bool
 	relayAIProvider    string
 	relayAPIKey        string
 	relayBaseURL       string
 	relayModel         string
 	relayInstructions  string
-	relayMaxRounds      int
-	relayCallTimeout    int
+	relayMaxRounds     int
+	relayCallTimeout   int
 	// WeCom credentials for cloud relay
 	relayWeComCorpID  string
 	relayWeComAgentID string
@@ -106,6 +109,7 @@ func init() {
 
 	relayCmd.Flags().StringVar(&relayUserID, "user-id", "", "User ID from /whoami (required, or RELAY_USER_ID env)")
 	relayCmd.Flags().StringVar(&relayPlatform, "platform", "", "Platform: feishu, slack, wechat, or wecom (required, or RELAY_PLATFORM env)")
+	relayCmd.Flags().StringVar(&relayHost, "host", "", "Base URL of the relay server (e.g. http://localhost:8080 or https://bot.lingti.com); sets --server and --webhook")
 	relayCmd.Flags().StringVar(&relayServerURL, "server", "", "WebSocket URL (default: wss://bot.lingti.com/ws, or RELAY_SERVER_URL env)")
 	relayCmd.Flags().StringVar(&relayWebhookURL, "webhook", "", "Webhook URL (default: https://bot.lingti.com/webhook, or RELAY_WEBHOOK_URL env)")
 	relayCmd.Flags().StringVar(&relayAIProvider, "provider", "", "AI provider: claude, deepseek, kimi, qwen (or AI_PROVIDER env)")
@@ -115,6 +119,7 @@ func init() {
 	relayCmd.Flags().StringVar(&relayInstructions, "instructions", "", "Path to custom instructions file appended to system prompt")
 	relayCmd.Flags().IntVar(&relayMaxRounds, "max-rounds", 0, "Max tool-call iterations per message (default 100, or AI_MAX_ROUNDS env)")
 	relayCmd.Flags().IntVar(&relayCallTimeout, "call-timeout", 0, "Base timeout in seconds for each AI API call (default 90, or AI_CALL_TIMEOUT env)")
+	relayCmd.Flags().BoolVar(&relayRefreshBotID, "refresh-bot-id", false, "Generate a new bot ID (invalidates existing bot page links)")
 
 	// WeCom credentials for cloud relay
 	relayCmd.Flags().StringVar(&relayWeComCorpID, "wecom-corp-id", "", "WeCom Corp ID (or WECOM_CORP_ID env)")
@@ -141,6 +146,28 @@ func runRelay(cmd *cobra.Command, args []string) {
 	}
 	if relayWebhookURL == "" {
 		relayWebhookURL = os.Getenv("RELAY_WEBHOOK_URL")
+	}
+
+	// --host sets both server and webhook URLs (explicit --server/--webhook override it)
+	if relayHost != "" {
+		// Derive WebSocket scheme from HTTP scheme
+		wsBase := strings.TrimRight(relayHost, "/")
+		httpBase := wsBase
+		if strings.HasPrefix(wsBase, "https://") {
+			wsBase = "wss://" + wsBase[len("https://"):]
+		} else if strings.HasPrefix(wsBase, "http://") {
+			wsBase = "ws://" + wsBase[len("http://"):]
+		} else {
+			// bare host, assume secure
+			wsBase = "wss://" + wsBase
+			httpBase = "https://" + httpBase
+		}
+		if relayServerURL == "" {
+			relayServerURL = wsBase + "/ws"
+		}
+		if relayWebhookURL == "" {
+			relayWebhookURL = httpBase + "/webhook"
+		}
 	}
 	if relayAIProvider == "" {
 		relayAIProvider = os.Getenv("AI_PROVIDER")
@@ -210,6 +237,27 @@ func runRelay(cmd *cobra.Command, args []string) {
 	// Fallback to saved config file
 	savedCfg, cfgErr := config.Load()
 	if cfgErr == nil {
+		// When agents are configured and no provider was explicitly set via CLI/env,
+		// prefer the default agent's AI config over relay.provider / ai.provider.
+		if relayAIProvider == "" && len(savedCfg.Agents) > 0 {
+			defaultID := savedCfg.DefaultAgentID()
+			if entry, ok := savedCfg.FindAgent(defaultID); ok {
+				ai := savedCfg.ResolveAgentAI(entry)
+				if ai.Provider != "" {
+					relayAIProvider = ai.Provider
+					if relayAPIKey == "" {
+						relayAPIKey = ai.APIKey
+					}
+					if relayBaseURL == "" {
+						relayBaseURL = ai.BaseURL
+					}
+					if relayModel == "" {
+						relayModel = ai.Model
+					}
+				}
+			}
+		}
+
 		// Resolve named provider: CLI --provider > env > relay.provider > ai.provider
 		providerRef := relayAIProvider
 		resolved, found := savedCfg.ResolveProvider(providerRef)
@@ -267,14 +315,35 @@ func runRelay(cmd *cobra.Command, args []string) {
 		if relayWeChatAppSecret == "" {
 			relayWeChatAppSecret = savedCfg.Platforms.WeChat.AppSecret
 		}
+
+		// Generate or refresh bot ID
+		if relayRefreshBotID || savedCfg.BotID == "" {
+			savedCfg.BotID = uuid.New().String()
+			if err := savedCfg.Save(); err != nil {
+				fmt.Fprintf(os.Stderr, "Warning: failed to save bot ID: %v\n", err)
+			}
+		}
+		if relayRefreshBotID {
+			botBase := "https://bot.lingti.com"
+			if relayHost != "" {
+				botBase = strings.TrimRight(relayHost, "/")
+				if !strings.HasPrefix(botBase, "http") {
+					botBase = "https://" + botBase
+				}
+			}
+			fmt.Printf("[Relay] Bot ID refreshed. New bot page: %s/bots/%s\n", botBase, savedCfg.BotID)
+			return
+		}
 	}
 
 	// Validate required parameters
-	if relayPlatform == "" {
+	// Platform is optional when a bot_id is configured (bot-page-only mode)
+	hasBotID := cfgErr == nil && savedCfg.BotID != ""
+	if relayPlatform == "" && !hasBotID {
 		fmt.Fprintln(os.Stderr, "Error: --platform is required (feishu, slack, wechat, or wecom)")
 		os.Exit(1)
 	}
-	if relayPlatform != "feishu" && relayPlatform != "slack" && relayPlatform != "wechat" && relayPlatform != "wecom" {
+	if relayPlatform != "" && relayPlatform != "feishu" && relayPlatform != "slack" && relayPlatform != "wechat" && relayPlatform != "wecom" {
 		fmt.Fprintln(os.Stderr, "Error: --platform must be 'feishu', 'slack', 'wechat', or 'wecom'")
 		os.Exit(1)
 	}
@@ -284,11 +353,14 @@ func runRelay(cmd *cobra.Command, args []string) {
 	}
 
 	// For WeCom, user-id is optional - auto-generate from corp_id
+	// For bot-page-only mode (no platform), user-id is optional - use bot ID as fallback
 	// For other platforms, user-id is required
 	if relayUserID == "" {
 		if relayPlatform == "wecom" && relayWeComCorpID != "" {
 			relayUserID = "wecom-" + relayWeComCorpID
-		} else if relayPlatform != "wecom" {
+		} else if relayPlatform == "" && hasBotID {
+			relayUserID = savedCfg.BotID
+		} else if relayPlatform != "wecom" && relayPlatform != "" {
 			fmt.Fprintln(os.Stderr, "Error: --user-id is required (get it from /whoami)")
 			os.Exit(1)
 		}
@@ -398,6 +470,10 @@ func runRelay(cmd *cobra.Command, args []string) {
 	}
 
 	// Create and register relay platform
+	var relayBotID string
+	if cfgErr == nil {
+		relayBotID = savedCfg.BotID
+	}
 	relayPlatformInstance, err := relay.New(relay.Config{
 		UserID:       relayUserID,
 		Platform:     relayPlatform,
@@ -405,6 +481,7 @@ func runRelay(cmd *cobra.Command, args []string) {
 		WebhookURL:   relayWebhookURL,
 		AIProvider:   providerName,
 		AIModel:      modelName,
+		BotID:        relayBotID,
 		WeComCorpID:     relayWeComCorpID,
 		WeComAgentID:    relayWeComAgentID,
 		WeComSecret:     relayWeComSecret,
@@ -430,6 +507,16 @@ func runRelay(cmd *cobra.Command, args []string) {
 
 	log.Printf("Relay connected. User: %s, Platform: %s", relayUserID, relayPlatform)
 	log.Printf("AI Provider: %s, Model: %s", providerName, modelName)
+	if relayBotID != "" {
+		botBase := "https://bot.lingti.com"
+		if relayHost != "" {
+			botBase = strings.TrimRight(relayHost, "/")
+			if !strings.HasPrefix(botBase, "http") {
+				botBase = "https://" + botBase
+			}
+		}
+		fmt.Printf("[Relay] Your bot page: %s/bots/%s\n", botBase, relayBotID)
+	}
 	log.Println("Press Ctrl+C to stop.")
 
 	// Wait for shutdown signal

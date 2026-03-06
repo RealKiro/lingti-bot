@@ -2,13 +2,15 @@
 
 ---
 
-# lingti-bot (灵小缇 [cli.lingti.com/bot](https://cli.lingti.com/bot))
+# lingti-bot (灵小缇 [bot.lingti.com](https://bot.lingti.com))
 
-> 🐕⚡「**极简至上 效率为王 一次编译 到处执行 极速接入**」的 AI Bot
+> 🐕⚡「**极简至上 效率为王 一次编译 到处执行 一步接入**」的 AI Bot
 
 [![Go Version](https://img.shields.io/badge/Go-1.23+-00ADD8?style=flat&logo=go)](https://go.dev/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Website](https://img.shields.io/badge/官网-cli.lingti.com-blue?style=flat)](https://cli.lingti.com/bot)
+[![Website](https://img.shields.io/badge/官网-cli.lingti.com-blue?style=flat)](https://bot.lingti.com)
+
+> 📖 **文档网站：[bot.lingti.com/docs](https://bot.lingti.com/docs)** — 完整文档、使用示例、接入教程、API 参考
 
 **灵小缇** 是一个集 **MCP Server**、**多平台消息网关**、**丰富工具集**、**智能对话**于一体的 AI Bot 平台。
 
@@ -30,211 +32,171 @@
 
 > 🐕⚡ **为什么叫"灵小缇"？** 灵缇犬（Greyhound）是世界上跑得最快的犬，以敏捷、忠诚著称。灵小缇同样敏捷高效，是你忠实的 AI 助手。
 
-## 安装
+## 快速开始
 
-### macOS / Linux / WSL
+**两步启动，无需平台账号，无需公网服务器：**
+
+**第一步：安装**
 
 ```bash
+# macOS / Linux / WSL
 curl -fsSL https://files.lingti.com/install-bot.sh | bash
+
+# Windows (PowerShell)
+irm https://files.lingti.com/install-bot.ps1 | iex
 ```
 
-### Windows (PowerShell)
-
-```powershell
-irm https://cli.lingti.com/install.ps1 | iex
-```
-
-安装完成后，通过交互式向导完成首次配置：
+**第二步：运行 relay，指定 AI 服务商和密钥**
 
 ```bash
-lingti-bot onboard
+lingti-bot relay --provider deepseek --api-key sk-xxx
 ```
 
-配置保存后，无需任何参数即可启动：
-
-```bash
-lingti-bot relay
-```
-
-也可以通过命令行参数直接启动，适合运行多个实例或覆盖已有配置：
-
-```bash
-lingti-bot relay --platform wecom --provider deepseek --api-key sk-xxx
-```
-
-## 样例
-
-### <a id="web-chat-ui"></a>内置 Web 聊天界面 — 浏览器直开，零配置
-
-无需微信、无需 Slack，一个参数即可在本地浏览器中打开完整聊天界面：
-
-```bash
-lingti-bot gateway --provider deepseek --api-key sk-xxx --webapp-port 8080
-# 打开浏览器访问 http://localhost:8080
-```
-
-<p align="center">
-<img src="docs/images/webapp-demo.png" alt="Web 聊天界面演示" width="800" />
-</p>
-
-**核心特性：**
-
-| 特性 | 说明 |
-|------|------|
-| **多会话并行** | 左侧边栏管理多个独立会话，每个会话有独立的 AI 记忆上下文，互不干扰 |
-| **并发处理** | 在会话 A 等待长任务时，立即切换到会话 B 发送新消息——两者并行处理 |
-| **会话持久化** | 所有会话列表和聊天记录保存在浏览器 `localStorage`，刷新页面不丢失 |
-| **Markdown 渲染** | AI 回复支持完整 Markdown：代码块、表格、列表、加粗等 |
-| **端口自动切换** | 若指定端口被占用，自动递增尝试直到找到空闲端口 |
-| **无需额外安装** | 纯 HTML + 原生 JS，内嵌于二进制，无 Node.js / npm 依赖 |
-
-**多会话并行示意：**
+启动后自动输出你的专属 Bot 页面：
 
 ```
-浏览器
-├── 会话 A（UUID-1）── AI 正在处理长任务...
-├── 会话 B（UUID-2）── 刚发了新消息，AI 立即响应
-└── 会话 C（UUID-3）── 历史记录，随时可查
+Your bot page: https://bot.lingti.com/bots/xxx
 ```
 
-每个会话对应一个独立 `channelID`，AI 记忆完全隔离——在会话 A 说的内容不会影响会话 B 的上下文。
+打开链接即可在浏览器中与 Bot 对话 — 仅需一条命令，无需配置任何消息平台。
 
-**通过配置文件启用：**
-
-```yaml
-# ~/.lingti.yaml
-platforms:
-  webapp:
-    port: 8080
-```
-
-**环境变量：**
-
-```bash
-export WEBAPP_PORT=8080
-lingti-bot gateway --provider deepseek --api-key sk-xxx
-```
+> 支持的 `--provider`：`deepseek`、`claude`、`kimi`、`minimax`、`gemini`、`openai` 等，详见 [AI-PROVIDERS.md](AI-PROVIDERS.md)。
 
 ---
 
-### 智能对话、文件管理、信息检索
-<table>
-<tr>
-<td width="33%"><img src="docs/images/demo-chat-1.png" alt="智能助手" /></td>
-<td width="33%"><img src="docs/images/demo-chat-2.png" alt="企业微信文件传输" /></td>
-<td width="33%"><img src="docs/images/demo-chat-3.png" alt="信息搜索" /></td>
-</tr>
-<tr>
-<td align="center"><sub>💬 智能对话</sub></td>
-<td align="center"><sub>📁 企微文件传输</sub></td>
-<td align="center"><sub>🔍 信息搜索</sub></td>
-</tr>
-</table>
+### 进阶：接入消息平台（企业微信、飞书等）
 
-<summary>📺 <b>后台运行演示</b> — <code>make && dist/lingti-bot gateway</code></summary>
-<br>
-<img src="docs/images/demo-terminal.png" alt="Terminal Demo" />
-<p><sub>克隆代码后直接编译运行，配合 DeepSeek 模型，实时处理钉钉消息</sub></p>
-
-### 定时任务 — AI 自动创建 Cron Job
-
-> 用自然语言创建定时任务 — 告诉 AI 你想要什么，剩下的交给它
-
-<p align="center">
-<img src="docs/images/demo-cron-wecom.png" alt="AI 创建定时任务演示" width="720" />
-</p>
-
-在企业微信中对 AI 说一句话，即可创建复杂的定时任务。支持 Cron 表达式调度、macOS 系统通知、Shell 脚本执行等，真正实现无人值守自动化。
-
-### 企业微信 AI 文件助手
-
-> 用自然语言管理和传输文件 — 就像跟同事说话一样简单
-
-<p align="center">
-<img src="docs/images/wecom-file-transfer.png" alt="企业微信 AI 文件传输" width="720" />
-</p>
-
-直接在企业微信中用自然语言浏览、查找、传输电脑上的文件。无需远程桌面，无需 U 盘，对 AI 说一句话即可。
-
-### 社交平台自动化 — AI 驱动的内容平台运营
-
-> 通过 MCP + Chrome 浏览器能力，让 AI 代替你操作知乎、小红书等内容平台
-
-lingti-bot 将浏览器自动化能力与 AI 深度结合，针对中国主流内容平台提供**智能化运营**支持。不是简单的脚本录制回放，而是 AI 理解页面语义后的精准操作。
-
-**已支持平台：**
-
-| 平台 | 发帖/回答 | 评论 | 点赞/收藏 | 状态 |
-|------|:---------:|:----:|:---------:|------|
-| **知乎** | ✅ | ✅ | ✅ | 已支持 |
-| **小红书** | 🔜 | 🔜 | 🔜 | 规划中 |
-| **微博** | 🔜 | 🔜 | 🔜 | 规划中 |
-| **抖音（网页版）** | 🔜 | 🔜 | 🔜 | 规划中 |
-| **B站** | 🔜 | 🔜 | 🔜 | 规划中 |
-| **今日头条** | 🔜 | 🔜 | 🔜 | 规划中 |
-
-**使用示例：**
-
-```
-"帮我在知乎上回答这个问题，内容围绕 Go 语言的优势"
-"打开知乎这篇文章，帮我写一条评论"
-"在小红书发一篇关于效率工具的笔记"
-"帮我给这篇知乎回答点个赞"
-```
-
-**工作原理：** AI 通过 MCP 协议调用浏览器工具（CDP 或 Chrome MCP），在你已登录的 Chrome 中操作，**复用你的登录态**，无需提供账号密码。AI 读取页面无障碍树快照，理解每个按钮和输入框的含义，像人一样精准操作。
-
-> 📖 **详细文档：[社交平台自动化指南](docs/social-platform-automation.md)**
-
-### 浏览器自动化 — 让 AI 像人一样操控浏览器
-
-> 无需 Puppeteer、无需 Node.js、无需安装任何依赖——直接用自然语言驾驭 Chrome
-
-lingti-bot 内置完整的 CDP（Chrome DevTools Protocol）自动化引擎，采用**快照-操作（Snapshot-then-Act）**模式：先读取页面无障碍树，理解每个元素的角色和名称，再精准点击、输入、截图。
-
-**直接在你正在使用的 Chrome 里操作：**
+如需接入企业微信、飞书、钉钉等平台，追加对应平台参数即可：
 
 ```bash
-# 1. 用调试端口启动 Chrome（一次配置，长期使用）
-/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \
-  --remote-debugging-port=9222 \
-  --user-data-dir="$HOME/.lingti-bot/chrome-profile"
+# 企业微信
+lingti-bot relay --platform wecom \
+  --wecom-corp-id ww... --wecom-agent-id 1000002 \
+  --wecom-secret xxx --wecom-token xxx --wecom-aes-key xxx \
+  --provider deepseek --api-key sk-xxx
 
-# 2. ~/.lingti.yaml 中添加一行
-# browser:
-#   cdp_url: "127.0.0.1:9222"
+# 飞书
+lingti-bot relay --platform feishu \
+  --feishu-app-id cli_xxx --feishu-app-secret xxx \
+  --provider claude --api-key sk-ant-xxx
 ```
 
-之后，对 AI 说话即可——bot 会在你已有的 Chrome 里开新标签页操作，不再另弹窗口：
+详见 [云中继文档](docs/cloud-relay.md)。
+
+### 安装方式
+
+## 样例
+
+> 📺 **完整演示、截图和使用示例，请访问：[bot.lingti.com/docs/examples](https://bot.lingti.com/docs/examples)**
+
+主要功能演示：
+
+- **[内置 Web 聊天界面](https://bot.lingti.com/docs/examples#web-chat-ui)** — 多会话并行，零配置，`--webapp-port 8080` 一键启用
+- **[定时任务](https://bot.lingti.com/docs/examples#cron-jobs)** — 用自然语言创建 Cron Job，AI 自动生成内容
+- **[企业微信文件助手](https://bot.lingti.com/docs/examples#wecom-file)** — 自然语言管理和传输文件
+- **[社交平台自动化](https://bot.lingti.com/docs/examples#social-automation)** — AI 代操作知乎、小红书等内容平台
+- **[浏览器自动化](https://bot.lingti.com/docs/examples#browser-automation)** — 自然语言驾驭 Chrome，无需 Puppeteer/Node.js
+
+---
+
+## Agents 与 Channels
+
+### 什么是 Agent？
+
+**Agent** 是 lingti-bot 中的 AI 实例单元。每个 Agent 拥有独立的：
+
+- **AI 配置** — 可指定不同的 provider、model、API Key，或继承全局配置
+- **系统提示词（Instructions）** — 定义 Agent 的角色、风格、行为边界
+- **工作目录（Workspace）** — Agent 读写文件的默认根目录，天然沙箱隔离
+
+典型用途：`work-assistant`（工作助手）、`coder`（专注代码）、`writer`（内容写作）……每个 Agent 可以有完全不同的人格和能力边界。
+
+### 什么是 Channel？
+
+**Channel** 是消息的来源/目标通道，对应一个具体的聊天平台接入点（如某个企业微信应用、某个 Slack Bot、某个 Telegram Bot）。你可以为不同 Channel 绑定不同的 Agent，实现"同一个 lingti-bot 进程，多个平台、多套 AI 人格"的效果。
+
+### 管理 Agents
+
+```bash
+# 交互式添加 Agent
+lingti-bot agents add
+
+# 列出所有 Agent
+lingti-bot agents list
+
+# 查看某个 Agent 详情
+lingti-bot agents info <name>
+
+# 删除 Agent
+lingti-bot agents remove <name>
+```
+
+**添加 Agent 示例：**
 
 ```
-"打开知乎，搜索 Go 语言并截图"
-"帮我登录 GitHub，查看我最新的 PR"
-"打开这个表单，填写姓名张三、手机 138xxxx1234，然后提交"
-"把电商后台所有待审核商品都批量通过"
-"每隔5分钟截一张这个监控大屏的图"
+$ lingti-bot agents add
+
+  Agent name — a short nickname you choose, e.g. "mybot", "work-assistant"
+  Agent name:
+  > lingti
+
+  AI Provider:
+    1. (inherit from base config)
+    2. deepseek     (recommended)
+    3. qwen         (tongyi qianwen)
+    4. claude       (Anthropic)
+    ...
+  Choice [1]: claude
+  Model (blank = inherit):
+  > claude-sonnet-4-20250514
+  API Key (blank = inherit):
+  > sk-ant-xxx
+  Instructions (text or file path, optional):
+  >
+  Mark as default agent? [y/N]: y
+  Workspace directory (default: ~/.lingti/agents/lingti):
+  >
+Agent "lingti" added (workspace: ~/.lingti/agents/lingti)
 ```
 
-**工作原理（AI 自动完成全部步骤）：**
+### 管理 Channels
 
-```
-browser_navigate url="https://www.zhihu.com"
-browser_snapshot
-→ [1] textbox "搜索" [2] button "搜索" [3] link "登录" ...
+```bash
+# 交互式添加 Channel 凭证（保存到 ~/.lingti.yaml）
+lingti-bot channels add
 
-browser_type ref=1 text="Go 语言" submit=true
-browser_snapshot
-→ 看到搜索结果列表
+# 列出所有已配置的 Channel
+lingti-bot channels list
 
-browser_screenshot path="/tmp/zhihu-result.png"
-→ 截图保存完成
+# 删除 Channel
+lingti-bot channels remove <name>
 ```
 
-14 个浏览器工具覆盖完整自动化流程：生命周期管理、导航、无障碍树快照、点击/输入/按键、JavaScript 执行、批量操作、多标签页管理、截图。
+### 添加 Channel 后如何启动？
 
-> 📖 **完整使用指南、连接配置、故障排除：[浏览器自动化文档](docs/browser-automation.md)**
->
-> 📋 **AI 操作规则详解（快照法则、搜索行为、弹窗处理、批量操作等）：[浏览器 AI 操作规则](docs/browser-agent-rules.md)**
+Channel 凭证保存到 `~/.lingti.yaml` 后，根据平台类型选择启动命令：
+
+**`gateway` 模式**（适用于大多数平台：Telegram、Discord、Slack、钉钉、飞书等）
+
+`gateway` 自动读取配置文件中所有已配置的平台，一条命令全部启动：
+
+```bash
+lingti-bot gateway
+```
+
+**`relay` 模式**（仅适用于需要云中继的平台：企业微信、微信公众号、飞书、Slack）
+
+`relay` 通过云中继服务器转发消息，需用 `--platform` 指定平台：
+
+```bash
+lingti-bot relay --platform wecom    # 企业微信
+lingti-bot relay --platform feishu   # 飞书
+lingti-bot relay --platform wechat   # 微信公众号
+```
+
+> **一句话区别：**
+> - `gateway` — 本地直连，支持所有平台，凭证来自配置文件，一条命令启动全部
+> - `relay` — 云中继，仅支持 wecom/feishu/wechat/slack，无需公网服务器
 
 ---
 
@@ -656,7 +618,7 @@ lingti-bot gateway \
 | **Bot** | 助理管理 | 数字员工接入与管理，简单到极致 ← *本项目* |
 | **Code** | 开发环境 | Terminal 回归舞台中央，极致输入效率 |
 
-> **为什么是 cli.lingti.com/bot 而不是 bot.lingti.com？**
+> **为什么是 bot.lingti.com 而不是 bot.lingti.com？**
 >
 > 因为 Bot 是 CLI 生态的一部分。IDE 正在消亡，纯粹的 Terminal 界面正在回归。未来的生产力工具，将围绕 CLI 重新构建。
 
@@ -1155,61 +1117,9 @@ make build  # 或: make darwin-arm64 / make linux-amd64
 
 ## 使用示例
 
-配置完成后，你可以让 AI 助手执行以下操作：
+> 📖 **完整使用示例（日历、文件、系统、浏览器、组合任务等）请访问：[bot.lingti.com/docs/examples](https://bot.lingti.com/docs/examples)**
 
-### 日历与日程
-
-```
-"今天有什么日程安排？"
-"这周有哪些会议？"
-"帮我创建一个明天下午3点的会议，标题是'产品评审'"
-"搜索所有包含'周报'的日程"
-```
-
-### 文件操作与传输
-
-```
-"列出桌面上的所有文件"
-"读取 ~/Documents/notes.txt 的内容"
-"将 ~/Desktop/报告.pdf 发送给我"
-"把 Documents 里的产品介绍发给我"
-"桌面上超过30天没动过的文件有哪些？"
-"帮我把这些旧文件移到废纸篓"
-```
-
-### 系统与进程
-
-```
-"我的电脑配置是什么？"
-"现在 CPU 占用多少？"
-"Chrome 占用了多少内存？"
-"结束 PID 1234 的进程"
-```
-
-### 网络与搜索
-
-```
-"我的 IP 地址是什么？"
-"帮我搜索一下最新的 AI 新闻"
-"查询 github.com 的 DNS"
-```
-
-### 音乐控制
-
-```
-"播放音乐"
-"下一首"
-"音量调到 50%"
-"播放周杰伦的歌"
-```
-
-### 组合任务
-
-```
-"查看今天的日程，然后检查天气，最后列出待办事项"
-"帮我整理桌面：列出超过60天的旧文件，然后移到废纸篓"
-"搜索最近的科技新闻，整理成备忘录"
-```
+配置完成后，你可以让 AI 助手执行日历管理、文件操作、系统信息查询、网页搜索、音乐控制、浏览器自动化等各类任务，支持自然语言组合调用多个工具。
 
 ---
 

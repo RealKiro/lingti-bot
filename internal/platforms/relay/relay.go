@@ -25,7 +25,7 @@ import (
 const (
 	DefaultServerURL  = "wss://bot.lingti.com/ws"
 	DefaultWebhookURL = "https://bot.lingti.com/webhook"
-	ClientVersion     = "1.8.1"
+	ClientVersion     = "1.9.5"
 
 	writeTimeout      = 10 * time.Second
 	readTimeout       = 60 * time.Second
@@ -41,6 +41,7 @@ type Config struct {
 	WebhookURL string // Webhook URL (default: https://bot.lingti.com/webhook)
 	AIProvider string // AI provider name (e.g., "claude", "deepseek")
 	AIModel    string // AI model name
+	BotID      string // Persistent bot ID for bot page feature
 	// WeCom credentials for cloud relay (when platform=wecom)
 	WeComCorpID  string
 	WeComAgentID string
@@ -85,6 +86,7 @@ type AuthMessage struct {
 	ClientVersion string `json:"client_version"`
 	AIProvider    string `json:"ai_provider,omitempty"`
 	AIModel       string `json:"ai_model,omitempty"`
+	BotID         string `json:"bot_id,omitempty"`
 	// WeCom credentials (for wecom platform)
 	WeComCorpID  string `json:"wecom_corp_id,omitempty"`
 	WeComAgentID string `json:"wecom_agent_id,omitempty"`
@@ -157,10 +159,13 @@ func New(cfg Config) (*Platform, error) {
 	if cfg.UserID == "" {
 		return nil, fmt.Errorf("user_id is required")
 	}
-	if cfg.Platform == "" {
+	validPlatform := cfg.Platform == "feishu" || cfg.Platform == "slack" ||
+		cfg.Platform == "wechat" || cfg.Platform == "wecom"
+	// Allow bot-page-only mode: no messaging platform needed when BotID is set
+	if cfg.Platform == "" && cfg.BotID == "" {
 		return nil, fmt.Errorf("platform is required")
 	}
-	if cfg.Platform != "feishu" && cfg.Platform != "slack" && cfg.Platform != "wechat" && cfg.Platform != "wecom" {
+	if cfg.Platform != "" && !validPlatform {
 		return nil, fmt.Errorf("platform must be 'feishu', 'slack', 'wechat', or 'wecom'")
 	}
 
@@ -377,10 +382,15 @@ func (p *Platform) Send(ctx context.Context, channelID string, resp router.Respo
 
 // sendWebhook sends a text response via the relay webhook
 func (p *Platform) sendWebhook(ctx context.Context, channelID string, resp router.Response) error {
+	// Use actual_platform from metadata when set (e.g. "botpage"), otherwise fall back to config platform
+	platform := p.config.Platform
+	if resp.Metadata != nil && resp.Metadata["actual_platform"] != "" {
+		platform = resp.Metadata["actual_platform"]
+	}
 	outgoing := OutgoingResponse{
 		Type:      "response",
 		MessageID: resp.Metadata["message_id"],
-		Platform:  p.config.Platform,
+		Platform:  platform,
 		ChannelID: channelID,
 		Text:      resp.Text,
 	}
@@ -509,6 +519,7 @@ func (p *Platform) connect() error {
 		ClientVersion: ClientVersion,
 		AIProvider:    p.config.AIProvider,
 		AIModel:       p.config.AIModel,
+		BotID:         p.config.BotID,
 		WeComCorpID:   p.config.WeComCorpID,
 		WeComAgentID:  p.config.WeComAgentID,
 		WeComSecret:   p.config.WeComSecret,
@@ -690,7 +701,13 @@ func (p *Platform) handleMessage(data []byte) {
 			metadata = make(map[string]string)
 		}
 		metadata["message_id"] = msg.ID
-		metadata["actual_platform"] = p.config.Platform
+		// Preserve the original platform (e.g. "botpage") so the response
+		// webhook can route back correctly instead of using p.config.Platform.
+		if msg.Platform != "" {
+			metadata["actual_platform"] = msg.Platform
+		} else {
+			metadata["actual_platform"] = p.config.Platform
+		}
 
 		p.messageHandler(router.Message{
 			ID:        msg.ID,

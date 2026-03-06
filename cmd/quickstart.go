@@ -36,7 +36,7 @@ Usage modes:
 For more information:
   lingti-bot help                       # Show all commands
   lingti-bot <command> --help           # Help for specific command
-  https://cli.lingti.com/bot            # Documentation
+  https://bot.lingti.com            # Documentation
   https://github.com/ruilisi/lingti-bot # Source code
 
 `)

@@ -38,11 +38,30 @@ var (
 )
 
 var agentsAddCmd = &cobra.Command{
-	Use:   "add <id>",
+	Use:   "add [id]",
 	Short: "Add a new agent to ~/.lingti.yaml",
-	Args:  cobra.ExactArgs(1),
+	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		id := args[0]
+		id := ""
+		if len(args) == 1 {
+			id = args[0]
+		}
+
+		interactive := id == "" && !cmd.Flags().Changed("provider") &&
+			!cmd.Flags().Changed("model") && !cmd.Flags().Changed("api-key") &&
+			!cmd.Flags().Changed("instructions") && !cmd.Flags().Changed("workspace")
+
+		if interactive || id == "" {
+			initScanner()
+		}
+
+		if id == "" {
+			fmt.Println("  Agent name — a short nickname you choose, e.g. \"mybot\", \"work-assistant\"")
+			id = promptText("Agent name", "")
+			if id == "" {
+				return fmt.Errorf("agent name is required")
+			}
+		}
 
 		cfg, err := config.Load()
 		if err != nil {
@@ -53,6 +72,27 @@ var agentsAddCmd = &cobra.Command{
 			if a.ID == id {
 				return fmt.Errorf("agent %q already exists", id)
 			}
+		}
+
+		if interactive {
+			// progressively prompt for optional fields
+			providerOpts := []string{"(inherit from base config)"}
+			for _, p := range providers {
+				providerOpts = append(providerOpts, p.label)
+			}
+			idx := promptSelect("AI Provider:", providerOpts, 0)
+			if idx > 0 {
+				agentProvider = providers[idx-1].name
+			}
+
+			agentModel = promptText("Model (blank = inherit)", "")
+			agentAPIKey = promptText("API Key (blank = inherit)", "")
+			agentInstructions = promptText("Instructions (text or file path, optional)", "")
+			agentDefault = promptYesNo("Mark as default agent?", false)
+
+			home, _ := os.UserHomeDir()
+			defaultWS := filepath.Join(home, ".lingti", "agents", id)
+			agentWorkspace = promptText("Workspace directory", defaultWS)
 		}
 
 		workspace := agentWorkspace
@@ -122,7 +162,7 @@ var agentsListCmd = &cobra.Command{
 		}
 
 		if len(cfg.Agents) == 0 {
-			fmt.Println("No agents configured. Use 'lingti-bot agents add <id>' to add one.")
+			fmt.Println("No agents configured. Use 'lingti-bot agents add' to add one.")
 			return nil
 		}
 

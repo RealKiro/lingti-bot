@@ -14,6 +14,7 @@ var (
 	logLevel         string
 	autoApprove      bool
 	disableFileTools bool
+	configFile       string
 )
 
 var rootCmd = &cobra.Command{
@@ -29,6 +30,9 @@ It provides tools for:
   - Process management
   - Network information`,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		if configFile != "" {
+			config.SetConfigPath(configFile)
+		}
 		// Parse and set log level
 		level, err := logger.ParseLevel(logLevel)
 		if err != nil {
@@ -40,6 +44,8 @@ It provides tools for:
 }
 
 func init() {
+	rootCmd.PersistentFlags().StringVar(&configFile, "config", "",
+		"Config file path (default: ~/.lingti.yaml)")
 	rootCmd.PersistentFlags().StringVar(&logLevel, "log", "info",
 		"Log level: trace, debug, info, warn, error, fatal, panic")
 	rootCmd.PersistentFlags().BoolVarP(&autoApprove, "yes", "y", false,

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/google/uuid"
 	"github.com/pltanton/lingti-bot/internal/agent"
 	"github.com/pltanton/lingti-bot/internal/browser"
 	"github.com/pltanton/lingti-bot/internal/config"
@@ -40,10 +41,11 @@ import (
 )
 
 var (
-	gatewayAddr       string
-	gatewayAuthToken  string
-	gatewayAuthTokens []string
-	gatewayNoWS       bool
+	gatewayAddr          string
+	gatewayAuthToken     string
+	gatewayAuthTokens    []string
+	gatewayNoWS          bool
+	gatewayRefreshBotID  bool
 )
 
 // Platform credential vars — used by gateway and the deprecated router alias.
@@ -173,6 +175,7 @@ func init() {
 	gatewayCmd.Flags().StringVar(&gatewayAuthToken, "auth-token", "", "Single authentication token (or GATEWAY_AUTH_TOKEN env)")
 	gatewayCmd.Flags().StringSliceVar(&gatewayAuthTokens, "auth-tokens", nil, "Multiple authentication tokens (or GATEWAY_AUTH_TOKENS env)")
 	gatewayCmd.Flags().BoolVar(&gatewayNoWS, "no-ws", false, "Disable WebSocket server")
+	gatewayCmd.Flags().BoolVar(&gatewayRefreshBotID, "refresh-bot-id", false, "Generate a new bot ID (invalidates existing share links)")
 
 	gatewayCmd.Flags().StringVar(&aiProvider, "provider", "", "AI provider: claude, deepseek, kimi, qwen (or AI_PROVIDER env)")
 	gatewayCmd.Flags().StringVar(&aiAPIKey, "api-key", "", "AI API Key (or AI_API_KEY env)")
@@ -259,6 +262,17 @@ func runGateway(cmd *cobra.Command, args []string) {
 	savedCfg, cfgErr := config.Load()
 	if cfgErr == nil {
 		applyRouterConfigFallbacks(savedCfg)
+	}
+
+	// Generate or refresh bot ID
+	if cfgErr == nil {
+		if gatewayRefreshBotID || savedCfg.BotID == "" {
+			savedCfg.BotID = uuid.New().String()
+			if err := savedCfg.Save(); err != nil {
+				fmt.Fprintf(os.Stderr, "Warning: failed to save bot ID: %v\n", err)
+			}
+		}
+		fmt.Printf("[Gateway] Your bot page: https://bot.lingti.com/bots/%s\n", savedCfg.BotID)
 	}
 
 	debugEnabled := logger.IsDebug()
@@ -617,6 +631,25 @@ func resolveRouterEnvVars() {
 
 // applyRouterConfigFallbacks fills remaining empty vars from the config file.
 func applyRouterConfigFallbacks(savedCfg *config.Config) {
+	// When agents are configured and no provider was explicitly set via CLI/env,
+	// prefer the default agent's AI config over relay.provider / ai.provider.
+	if aiProvider == "" && len(savedCfg.Agents) > 0 {
+		defaultID := savedCfg.DefaultAgentID()
+		if entry, ok := savedCfg.FindAgent(defaultID); ok {
+			ai := savedCfg.ResolveAgentAI(entry)
+			if ai.Provider != "" {
+				aiProvider = ai.Provider
+				aiAPIKey = ai.APIKey
+				aiBaseURL = ai.BaseURL
+				aiModel = ai.Model
+				if aiCallTimeout == 0 && savedCfg.AI.CallTimeoutSecs > 0 {
+					aiCallTimeout = savedCfg.AI.CallTimeoutSecs
+				}
+				return
+			}
+		}
+	}
+
 	resolved, found := savedCfg.ResolveProvider(aiProvider)
 	if found {
 		if aiProvider == "" {
@@ -785,8 +818,8 @@ func registerPlatforms(r *router.Router) {
 	if slackBotToken != "" && slackAppToken != "" {
 		p, err := slack.New(slack.Config{BotToken: slackBotToken, AppToken: slackAppToken})
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error creating Slack platform: %v\n", err)
-			os.Exit(1)
+			logger.Warn("Error creating Slack platform: %v, skipping", err)
+			return
 		}
 		r.Register(p)
 	} else {
@@ -796,8 +829,8 @@ func registerPlatforms(r *router.Router) {
 	if feishuAppID != "" && feishuAppSecret != "" {
 		p, err := feishu.New(feishu.Config{AppID: feishuAppID, AppSecret: feishuAppSecret})
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error creating Feishu platform: %v\n", err)
-			os.Exit(1)
+			logger.Warn("Error creating Feishu platform: %v, skipping", err)
+			return
 		}
 		r.Register(p)
 	} else {
@@ -807,8 +840,8 @@ func registerPlatforms(r *router.Router) {
 	if telegramToken != "" {
 		p, err := telegram.New(telegram.Config{Token: telegramToken})
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error creating Telegram platform: %v\n", err)
-			os.Exit(1)
+			logger.Warn("Error creating Telegram platform: %v, skipping", err)
+			return
 		}
 		r.Register(p)
 	} else {
@@ -818,8 +851,8 @@ func registerPlatforms(r *router.Router) {
 	if discordToken != "" {
 		p, err := discord.New(discord.Config{Token: discordToken})
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error creating Discord platform: %v\n", err)
-			os.Exit(1)
+			logger.Warn("Error creating Discord platform: %v, skipping", err)
+			return
 		}
 		r.Register(p)
 	} else {
@@ -832,8 +865,8 @@ func registerPlatforms(r *router.Router) {
 			Token: wecomToken, EncodingAESKey: wecomAESKey, CallbackPort: wecomPort,
 		})
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error creating WeCom platform: %v\n", err)
-			os.Exit(1)
+			logger.Warn("Error creating WeCom platform: %v, skipping", err)
+			return
 		}
 		r.Register(p)
 	} else {
@@ -843,8 +876,8 @@ func registerPlatforms(r *router.Router) {
 	if dingtalkClientID != "" && dingtalkClientSecret != "" {
 		p, err := dingtalk.New(dingtalk.Config{ClientID: dingtalkClientID, ClientSecret: dingtalkClientSecret})
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error creating DingTalk platform: %v\n", err)
-			os.Exit(1)
+			logger.Warn("Error creating DingTalk platform: %v, skipping", err)
+			return
 		}
 		r.Register(p)
 	} else {
@@ -857,8 +890,8 @@ func registerPlatforms(r *router.Router) {
 			Password: nextcloudPassword, RoomToken: nextcloudRoomToken,
 		})
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error creating Nextcloud Talk platform: %v\n", err)
-			os.Exit(1)
+			logger.Warn("Error creating Nextcloud Talk platform: %v, skipping", err)
+			return
 		}
 		r.Register(p)
 	} else {
@@ -868,8 +901,8 @@ func registerPlatforms(r *router.Router) {
 	if zaloAppID != "" && zaloAccessToken != "" {
 		p, err := zalo.New(zalo.Config{AppID: zaloAppID, SecretKey: zaloSecretKey, AccessToken: zaloAccessToken})
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error creating Zalo platform: %v\n", err)
-			os.Exit(1)
+			logger.Warn("Error creating Zalo platform: %v, skipping", err)
+			return
 		}
 		r.Register(p)
 	} else {
@@ -879,8 +912,8 @@ func registerPlatforms(r *router.Router) {
 	if nostrPrivateKey != "" && nostrRelays != "" {
 		p, err := nostr.New(nostr.Config{PrivateKey: nostrPrivateKey, Relays: nostrRelays})
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error creating NOSTR platform: %v\n", err)
-			os.Exit(1)
+			logger.Warn("Error creating NOSTR platform: %v, skipping", err)
+			return
 		}
 		r.Register(p)
 	} else {
@@ -890,8 +923,8 @@ func registerPlatforms(r *router.Router) {
 	if twitchToken != "" && twitchChannel != "" && twitchBotName != "" {
 		p, err := twitch.New(twitch.Config{Token: twitchToken, Channel: twitchChannel, BotName: twitchBotName})
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error creating Twitch platform: %v\n", err)
-			os.Exit(1)
+			logger.Warn("Error creating Twitch platform: %v, skipping", err)
+			return
 		}
 		r.Register(p)
 	} else {
@@ -901,8 +934,8 @@ func registerPlatforms(r *router.Router) {
 	if signalAPIURL != "" && signalPhoneNumber != "" {
 		p, err := signalplatform.New(signalplatform.Config{APIURL: signalAPIURL, PhoneNumber: signalPhoneNumber})
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error creating Signal platform: %v\n", err)
-			os.Exit(1)
+			logger.Warn("Error creating Signal platform: %v, skipping", err)
+			return
 		}
 		r.Register(p)
 	} else {
@@ -912,8 +945,8 @@ func registerPlatforms(r *router.Router) {
 	if blueBubblesURL != "" && blueBubblesPassword != "" {
 		p, err := imessage.New(imessage.Config{BlueBubblesURL: blueBubblesURL, BlueBubblesPassword: blueBubblesPassword})
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error creating iMessage platform: %v\n", err)
-			os.Exit(1)
+			logger.Warn("Error creating iMessage platform: %v, skipping", err)
+			return
 		}
 		r.Register(p)
 	} else {
@@ -923,8 +956,8 @@ func registerPlatforms(r *router.Router) {
 	if mattermostServerURL != "" && mattermostToken != "" {
 		p, err := mattermost.New(mattermost.Config{ServerURL: mattermostServerURL, Token: mattermostToken, TeamName: mattermostTeamName})
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error creating Mattermost platform: %v\n", err)
-			os.Exit(1)
+			logger.Warn("Error creating Mattermost platform: %v, skipping", err)
+			return
 		}
 		r.Register(p)
 	} else {
@@ -934,8 +967,8 @@ func registerPlatforms(r *router.Router) {
 	if googlechatProjectID != "" {
 		p, err := googlechat.New(googlechat.Config{ProjectID: googlechatProjectID, CredentialsFile: googlechatCredentialsFile})
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error creating Google Chat platform: %v\n", err)
-			os.Exit(1)
+			logger.Warn("Error creating Google Chat platform: %v, skipping", err)
+			return
 		}
 		r.Register(p)
 	} else {
@@ -945,8 +978,8 @@ func registerPlatforms(r *router.Router) {
 	if matrixHomeserverURL != "" && matrixAccessToken != "" {
 		p, err := matrix.New(matrix.Config{HomeserverURL: matrixHomeserverURL, UserID: matrixUserID, AccessToken: matrixAccessToken})
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error creating Matrix platform: %v\n", err)
-			os.Exit(1)
+			logger.Warn("Error creating Matrix platform: %v, skipping", err)
+			return
 		}
 		r.Register(p)
 	} else {
@@ -956,8 +989,8 @@ func registerPlatforms(r *router.Router) {
 	if teamsAppID != "" && teamsAppPassword != "" {
 		p, err := teams.New(teams.Config{AppID: teamsAppID, AppPassword: teamsAppPassword, TenantID: teamsTenantID})
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error creating Teams platform: %v\n", err)
-			os.Exit(1)
+			logger.Warn("Error creating Teams platform: %v, skipping", err)
+			return
 		}
 		r.Register(p)
 	} else {
@@ -967,8 +1000,8 @@ func registerPlatforms(r *router.Router) {
 	if lineChannelSecret != "" && lineChannelToken != "" {
 		p, err := line.New(line.Config{ChannelSecret: lineChannelSecret, ChannelToken: lineChannelToken})
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error creating LINE platform: %v\n", err)
-			os.Exit(1)
+			logger.Warn("Error creating LINE platform: %v, skipping", err)
+			return
 		}
 		r.Register(p)
 	} else {
@@ -978,8 +1011,8 @@ func registerPlatforms(r *router.Router) {
 	if whatsappPhoneID != "" && whatsappAccessToken != "" {
 		p, err := whatsapp.New(whatsapp.Config{PhoneNumberID: whatsappPhoneID, AccessToken: whatsappAccessToken, VerifyToken: whatsappVerifyToken})
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error creating WhatsApp platform: %v\n", err)
-			os.Exit(1)
+			logger.Warn("Error creating WhatsApp platform: %v, skipping", err)
+			return
 		}
 		r.Register(p)
 	} else {
@@ -989,8 +1022,8 @@ func registerPlatforms(r *router.Router) {
 	if webappPort > 0 {
 		p, err := webapp.New(webapp.Config{Port: webappPort})
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error creating webapp platform: %v\n", err)
-			os.Exit(1)
+			logger.Warn("Error creating webapp platform: %v, skipping", err)
+			return
 		}
 		r.Register(p)
 	}
