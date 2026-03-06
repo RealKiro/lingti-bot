@@ -2,13 +2,13 @@
 
 ---
 
-# lingti-bot (灵小缇 [cli.lingti.com/bot](https://cli.lingti.com/bot))
+# lingti-bot (灵小缇 [bot.lingti.com](https://bot.lingti.com))
 
-> 🐕⚡「**极简至上 效率为王 一次编译 到处执行 极速接入**」的 AI Bot
+> 🐕⚡「**极简至上 效率为王 一次编译 到处执行 一步接入**」的 AI Bot
 
 [![Go Version](https://img.shields.io/badge/Go-1.23+-00ADD8?style=flat&logo=go)](https://go.dev/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Website](https://img.shields.io/badge/官网-cli.lingti.com-blue?style=flat)](https://cli.lingti.com/bot)
+[![Website](https://img.shields.io/badge/官网-cli.lingti.com-blue?style=flat)](https://bot.lingti.com)
 
 **灵小缇** 是一个集 **MCP Server**、**多平台消息网关**、**丰富工具集**、**智能对话**于一体的 AI Bot 平台。
 
@@ -677,7 +677,7 @@ lingti-bot gateway \
 | **Bot** | 助理管理 | 数字员工接入与管理，简单到极致 ← *本项目* |
 | **Code** | 开发环境 | Terminal 回归舞台中央，极致输入效率 |
 
-> **为什么是 cli.lingti.com/bot 而不是 bot.lingti.com？**
+> **为什么是 bot.lingti.com 而不是 bot.lingti.com？**
 >
 > 因为 Bot 是 CLI 生态的一部分。IDE 正在消亡，纯粹的 Terminal 界面正在回归。未来的生产力工具，将围绕 CLI 重新构建。
 

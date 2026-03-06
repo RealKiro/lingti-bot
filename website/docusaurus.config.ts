@@ -91,7 +91,7 @@ const config: Config = {
           title: '更多',
           items: [
             {label: 'GitHub', href: 'https://github.com/ruilisi/lingti-bot'},
-            {label: '官网', href: 'https://cli.lingti.com/bot'},
+            {label: '官网', href: 'https://bot.lingti.com'},
           ],
         },
       ],

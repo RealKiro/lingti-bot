@@ -8,7 +8,7 @@ English | [中文](./README.md)
 
 [![Go Version](https://img.shields.io/badge/Go-1.23+-00ADD8?style=flat&logo=go)](https://go.dev/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Website](https://img.shields.io/badge/Website-cli.lingti.com-blue?style=flat)](https://cli.lingti.com/bot)
+[![Website](https://img.shields.io/badge/Website-cli.lingti.com-blue?style=flat)](https://bot.lingti.com)
 
 **Lingti Bot** is an all-in-one AI Bot platform featuring \*\*MCP Server\*\*, \*\*multi-platform messaging gateway\*\*, \*\*rich toolset\*\*, and \*\*intelligent conversation\*\*.
 
@@ -405,6 +405,6 @@ MIT License - see [LICENSE](LICENSE) file for details
 
 ## Contact
 
-- Website: [cli.lingti.com](https://cli.lingti.com/bot)
+- Website: [cli.lingti.com](https://bot.lingti.com)
 - Email: `jiefeng@ruc.edu.cn` / `jiefeng.hopkins@gmail.com`
 - GitHub: [github.com/ruilisi/lingti-bot](https://github.com/ruilisi/lingti-bot)
