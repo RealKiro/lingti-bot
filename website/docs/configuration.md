@@ -44,7 +44,7 @@ lingti-bot onboard
 ```yaml
 mode: relay  # "relay" 或 "router"
 
-# 推荐：命名 Provider 配置
+# ── 命名 Provider 配置（推荐）────────────────────────────────────────────────
 # 每个 provider 独立定义 api_key / base_url / model，不会互相污染
 providers:
   my-deepseek:
@@ -55,8 +55,67 @@ providers:
     provider: kimi
     api_key: ak-xxx
     model: kimi-k2.5
+  my-claude:
+    provider: claude
+    api_key: sk-ant-xxx
+    model: claude-sonnet-4-20250514
 
-# 旧格式（仍然支持，向后兼容）
+# ── Agents（推荐）────────────────────────────────────────────────────────────
+# 每个 Agent 是独立的 AI 人格单元，拥有独立的 provider、指令、工作目录。
+# 用 `lingti-bot agents add` 交互式创建，或直接在此配置。
+#
+# 字段：
+#   id           — 唯一标识，bindings 中引用
+#   default      — true = 无匹配 binding 时的兜底 agent
+#   provider     — 引用 providers 中的 key（或直接写 provider 名称）
+#   api_key      — 覆盖 provider 的 api_key（可选）
+#   model        — 覆盖 provider 的 model（可选）
+#   instructions — 系统提示词文本，或指向 .md/.txt 文件的路径
+#   workspace    — 文件操作的根目录（默认 ~/.lingti/agents/<id>）
+#   allow_tools  — 工具白名单（空 = 允许全部）
+#   deny_tools   — 工具黑名单（在白名单之后检查）
+agents:
+  - id: default
+    default: true
+    provider: my-deepseek
+    instructions: "You are a helpful assistant."
+    workspace: ~/Projects
+
+  - id: coder
+    provider: my-claude
+    instructions: |
+      You are an expert software engineer. Focus on clean, efficient code.
+    workspace: ~/Projects
+    deny_tools:
+      - file_trash
+      - notification_send
+
+  - id: writer
+    provider: my-kimi
+    instructions: ~/agents/writer-instructions.md   # 从文件加载
+    workspace: ~/Documents/writing
+
+# ── Bindings（推荐）──────────────────────────────────────────────────────────
+# 将消息来源（平台 + 频道）路由到指定 agent。
+# 规则从上到下匹配，第一个命中的生效。无匹配时使用 default agent。
+# 用 `lingti-bot agents bind <id> --bind <platform>[:<channel_id>]` 添加。
+bindings:
+  - agent_id: coder
+    comment: "Slack #dev 频道 → coder agent"
+    match:
+      platform: slack
+      channel_id: C12345ABCDE
+
+  - agent_id: writer
+    comment: "所有 Telegram 消息 → writer agent"
+    match:
+      platform: telegram
+
+  - agent_id: default
+    comment: "其他所有消息"
+    match: {}
+
+# ── 旧格式 AI 配置（仍然支持，向后兼容）──────────────────────────────────────
 ai:
   provider: deepseek
   api_key: sk-xxx
@@ -65,15 +124,15 @@ ai:
   max_rounds: 100    # 每条消息最多工具调用轮次（默认 100）
   call_timeout_secs: 90  # 每次 AI API 调用的基础超时秒数（默认 90）；使用本地 Ollama 等慢速模型时可适当增大
 
-  # 按平台/频道覆盖 AI 设置（旧格式，可选）
+  # 按平台/频道覆盖 AI 设置（旧格式；建议迁移到 agents + bindings）
   # 匹配优先级：platform + channel_id > platform > 默认
   overrides:
-    - platform: telegram        # 平台名（必填）
-      provider: claude          # 覆盖 provider
-      api_key: sk-ant-xxx       # 覆盖 api_key
+    - platform: telegram
+      provider: claude
+      api_key: sk-ant-xxx
       model: claude-sonnet-4-20250514
     - platform: slack
-      channel_id: C12345        # 可选：指定频道
+      channel_id: C12345
       provider: openai
       api_key: sk-xxx
       model: gpt-4o
@@ -81,10 +140,10 @@ ai:
   # 外部 MCP 服务器（可选）：bot 启动时自动连接并将其工具暴露给 AI
   # 工具名称格式：mcp_<name>_<tool_name>
   mcp_servers:
-    - name: chrome          # 工具名前缀，如 mcp_chrome_take_snapshot
+    - name: chrome
       command: npx
       args: ["chrome-devtools-mcp", "--browserUrl=http://127.0.0.1:9222"]
-    # - name: my_server      # SSE 方式连接
+    # - name: my_server
     #   url: http://localhost:3000/sse
 
 relay:
