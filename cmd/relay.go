@@ -332,11 +332,14 @@ func runRelay(cmd *cobra.Command, args []string) {
 	}
 
 	// For WeCom, user-id is optional - auto-generate from corp_id
+	// For bot-page-only mode (no platform), user-id is optional - use bot ID as fallback
 	// For other platforms, user-id is required
 	if relayUserID == "" {
 		if relayPlatform == "wecom" && relayWeComCorpID != "" {
 			relayUserID = "wecom-" + relayWeComCorpID
-		} else if relayPlatform != "wecom" {
+		} else if relayPlatform == "" && hasBotID {
+			relayUserID = savedCfg.BotID
+		} else if relayPlatform != "wecom" && relayPlatform != "" {
 			fmt.Fprintln(os.Stderr, "Error: --user-id is required (get it from /whoami)")
 			os.Exit(1)
 		}
