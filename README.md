@@ -99,6 +99,81 @@ lingti-bot relay --platform feishu \
 
 ---
 
+## Agents 与 Channels
+
+### 什么是 Agent？
+
+**Agent** 是 lingti-bot 中的 AI 实例单元。每个 Agent 拥有独立的：
+
+- **AI 配置** — 可指定不同的 provider、model、API Key，或继承全局配置
+- **系统提示词（Instructions）** — 定义 Agent 的角色、风格、行为边界
+- **工作目录（Workspace）** — Agent 读写文件的默认根目录，天然沙箱隔离
+
+典型用途：`work-assistant`（工作助手）、`coder`（专注代码）、`writer`（内容写作）……每个 Agent 可以有完全不同的人格和能力边界。
+
+### 什么是 Channel？
+
+**Channel** 是消息的来源/目标通道，对应一个具体的聊天平台接入点（如某个企业微信应用、某个 Slack Bot、某个 Telegram Bot）。你可以为不同 Channel 绑定不同的 Agent，实现"同一个 lingti-bot 进程，多个平台、多套 AI 人格"的效果。
+
+### 管理 Agents
+
+```bash
+# 交互式添加 Agent
+lingti-bot agents add
+
+# 列出所有 Agent
+lingti-bot agents list
+
+# 查看某个 Agent 详情
+lingti-bot agents info <name>
+
+# 删除 Agent
+lingti-bot agents remove <name>
+```
+
+**添加 Agent 示例：**
+
+```
+$ lingti-bot agents add
+
+  Agent name — a short nickname you choose, e.g. "mybot", "work-assistant"
+  Agent name:
+  > lingti
+
+  AI Provider:
+    1. (inherit from base config)
+    2. deepseek     (recommended)
+    3. qwen         (tongyi qianwen)
+    4. claude       (Anthropic)
+    ...
+  Choice [1]: claude
+  Model (blank = inherit):
+  > claude-sonnet-4-20250514
+  API Key (blank = inherit):
+  > sk-ant-xxx
+  Instructions (text or file path, optional):
+  >
+  Mark as default agent? [y/N]: y
+  Workspace directory (default: ~/.lingti/agents/lingti):
+  >
+Agent "lingti" added (workspace: ~/.lingti/agents/lingti)
+```
+
+### 管理 Channels
+
+```bash
+# 交互式添加 Channel（绑定平台 + Agent）
+lingti-bot channels add
+
+# 列出所有 Channel
+lingti-bot channels list
+
+# 删除 Channel
+lingti-bot channels remove <name>
+```
+
+---
+
 ## 为什么选择 lingti-bot？
 
 ### lingti-bot vs OpenClaw
