@@ -237,6 +237,27 @@ func runRelay(cmd *cobra.Command, args []string) {
 	// Fallback to saved config file
 	savedCfg, cfgErr := config.Load()
 	if cfgErr == nil {
+		// When agents are configured and no provider was explicitly set via CLI/env,
+		// prefer the default agent's AI config over relay.provider / ai.provider.
+		if relayAIProvider == "" && len(savedCfg.Agents) > 0 {
+			defaultID := savedCfg.DefaultAgentID()
+			if entry, ok := savedCfg.FindAgent(defaultID); ok {
+				ai := savedCfg.ResolveAgentAI(entry)
+				if ai.Provider != "" {
+					relayAIProvider = ai.Provider
+					if relayAPIKey == "" {
+						relayAPIKey = ai.APIKey
+					}
+					if relayBaseURL == "" {
+						relayBaseURL = ai.BaseURL
+					}
+					if relayModel == "" {
+						relayModel = ai.Model
+					}
+				}
+			}
+		}
+
 		// Resolve named provider: CLI --provider > env > relay.provider > ai.provider
 		providerRef := relayAIProvider
 		resolved, found := savedCfg.ResolveProvider(providerRef)
